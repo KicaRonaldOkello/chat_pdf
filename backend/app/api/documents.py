@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app import store
+from app import document_data
 from app.config import MAX_DOCS_PER_CHAT
 
 
@@ -35,10 +35,10 @@ def doc_label(filename: str, doc_id: str) -> str:
     return doc_id
 
 
-def readiness_error_for_documents(doc_ids: list[str]) -> str | None:
+async def readiness_error_for_documents(doc_ids: list[str]) -> str | None:
     problems: list[str] = []
     for did in doc_ids:
-        s = store.get_status(did)
+        s = await document_data.get_status(did)
         if s is None:
             problems.append(f"{did}: unknown document_id (upload the PDF again)")
             continue

@@ -18,7 +18,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { firstValueFrom, Subscription } from 'rxjs';
 import * as pdfjsLib from 'pdfjs-dist';
-import type { PDFDocumentProxy } from 'pdfjs-dist';
+import type { PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist';
 
 import { ensurePdfWorker } from './pdfjs-worker';
 import { RetrievedSource } from '../interfaces';
@@ -87,7 +87,23 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
   searchResultsHidden = false;
 
   private pdf: PDFDocumentProxy | null = null;
+  /**
+   * While getDocument is in flight, the loading task must be destroyed on teardown
+   * (e.g. route /app -> /app/research when a second file is added). `this.pdf` is
+   * still null, so we cannot rely on pdf.destroy() alone. PDF.js 4+ shares one
+   * `workerPort` — if a new getDocument runs before the prior task's destroy()
+   * completes, PDFWorker.fromPort throws.
+   */
+  private inFlightLoad: PDFDocumentLoadingTask | null = null;
   private loadGeneration = 0;
+  /**
+   * All worker-touching steps (destroy, getDocument) must be strictly serialized.
+   * A second `loadPdf` can start while a prior `await doc.destroy()` (which sets
+   * `_pendingDestroy` on the shared `workerPort` PDFWorker) is still in flight: the
+   * first `destroyDocument` nulled `this.pdf` already, so the second `destroy`
+   * no-ops, then `getDocument` throws `PDFWorker.fromPort - the worker is being destroyed`.
+   */
+  private pdfWorkQueue: Promise<void> = Promise.resolve();
   private viewReady = false;
   private resizeObserver?: ResizeObserver;
   private resizeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -145,7 +161,12 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
     }
     this.resizeObserver?.disconnect();
     this.disconnectPageObserver();
-    void this.teardown();
+    this.loadGeneration++;
+    void this.cancelInFlightLoad();
+    this.pdfWorkQueue = this.pdfWorkQueue
+      .then(() => this.destroyDocument())
+      .catch((e) => console.error('PDF viewer teardown', e));
+    void this.pdfWorkQueue;
   }
 
   toggleThumbnails(): void {
@@ -551,13 +572,18 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
     });
   }
 
-  private async loadPdf(): Promise<void> {
+  private loadPdf(): void {
+    this.loadGeneration++;
+    const myGen = this.loadGeneration;
+    this.pdfWorkQueue = this.pdfWorkQueue
+      .then(() => this.runLoadForGeneration(myGen))
+      .catch((e) => console.error('PDF viewer load', e));
+  }
+
+  private async runLoadForGeneration(myGen: number): Promise<void> {
     if (!this.viewReady || !this.pagesHost?.nativeElement) {
       return;
     }
-
-    this.loadGeneration++;
-    const gen = this.loadGeneration;
 
     this.loading = true;
     this.error = null;
@@ -570,7 +596,8 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
 
     await this.destroyDocument();
 
-    if (gen !== this.loadGeneration) {
+    if (myGen !== this.loadGeneration) {
+      this.loading = false;
       return;
     }
 
@@ -591,9 +618,13 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
         cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/cmaps/`,
         cMapPacked: true
       });
+      this.inFlightLoad = loadingTask;
       const pdf = await loadingTask.promise;
+      if (this.inFlightLoad === loadingTask) {
+        this.inFlightLoad = null;
+      }
 
-      if (gen !== this.loadGeneration) {
+      if (myGen !== this.loadGeneration) {
         await pdf.destroy();
         return;
       }
@@ -605,7 +636,7 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
       this.currentPage =
         saved !== undefined && saved >= 1 && saved <= pdf.numPages ? saved : 1;
       this.pdfReady = true;
-      await this.paintPages(gen);
+      await this.paintPages(myGen);
       this.applyPendingSourceJumpAfterLoad();
       this.thumbsRenderToken++;
       if (this.thumbnailsOpen) {
@@ -613,11 +644,12 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
         void this.ensureThumbnailsRendered();
       }
     } catch (e) {
-      if (gen === this.loadGeneration) {
+      await this.cancelInFlightLoad();
+      if (myGen === this.loadGeneration) {
         this.error = e instanceof Error ? e.message : String(e);
       }
     } finally {
-      if (gen === this.loadGeneration) {
+      if (myGen === this.loadGeneration) {
         this.loading = false;
       }
     }
@@ -716,7 +748,26 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
     }
   }
 
+  /**
+   * Abort a getDocument that has not yet resolved. Required when the shared
+   * worker is used with `workerPort` so the next open does not see
+   * `_pendingDestroy` and throw from PDFWorker.fromPort.
+   */
+  private async cancelInFlightLoad(): Promise<void> {
+    const t = this.inFlightLoad;
+    if (!t) {
+      return;
+    }
+    this.inFlightLoad = null;
+    try {
+      await t.destroy();
+    } catch {
+      /* idempotent / already torn down */
+    }
+  }
+
   private async destroyDocument(): Promise<void> {
+    await this.cancelInFlightLoad();
     const doc = this.pdf;
     this.pdf = null;
     this.pdfReady = false;
@@ -738,8 +789,4 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
     this.thumbsRenderToken++;
   }
 
-  private async teardown(): Promise<void> {
-    this.loadGeneration++;
-    await this.destroyDocument();
-  }
 }

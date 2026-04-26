@@ -12,13 +12,21 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { LumenChatPanelComponent } from '../lumen-chat-panel/lumen-chat-panel.component';
+import {
+  LibraryPickerDialogComponent,
+  LibraryPickerDialogData
+} from '../library-picker-dialog/library-picker-dialog.component';
 import { PdfViewerComponent } from '../pdf-viewer/pdf-viewer.component';
+import { UploadedFileItem } from '../interfaces';
 import { DocumentSessionService } from '../services/document-session.service';
 import { MainChromeService } from '../services/main-chrome.service';
+import { ClerkService } from 'ngx-clerk';
 
 @Component({
   selector: 'app-batch-workspace',
@@ -26,6 +34,7 @@ import { MainChromeService } from '../services/main-chrome.service';
     CommonModule,
     MatButtonModule,
     MatIconModule,
+    MatMenuModule,
     MatTooltipModule,
     LumenChatPanelComponent,
     PdfViewerComponent
@@ -38,6 +47,8 @@ export class BatchWorkspaceComponent implements OnInit, AfterViewInit, OnDestroy
   private readonly router = inject(Router);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly chrome = inject(MainChromeService);
+  private readonly dialog = inject(MatDialog);
+  protected readonly clerk = inject(ClerkService);
   @ViewChild('splitShell') private splitShell?: ElementRef<HTMLElement>;
   @ViewChild('addFileInput') private addFileInput?: ElementRef<HTMLInputElement>;
   splitResizerDragging = false;
@@ -147,6 +158,38 @@ export class BatchWorkspaceComponent implements OnInit, AfterViewInit, OnDestroy
     input.value = '';
     void this.session
       .uploadPdfsFromFiles(fileArray, { mode: 'batch', append: true })
+      .then(() => this.cdr.markForCheck());
+  }
+
+  openLibraryDialog(): void {
+    if (!this.clerk.isLoaded() || !this.clerk.isSignedIn()) {
+      return;
+    }
+    const data: LibraryPickerDialogData = {
+      openDocumentIds: this.session.openDocuments.map((d) => d.id)
+    };
+    this.dialog
+      .open<LibraryPickerDialogComponent, LibraryPickerDialogData, UploadedFileItem | undefined>(
+        LibraryPickerDialogComponent,
+        {
+          data,
+          width: 'min(420px, 92vw)',
+          maxWidth: '95vw',
+          autoFocus: 'first-heading',
+          panelClass: 'lumen-library-dialog-panel'
+        }
+      )
+      .afterClosed()
+      .subscribe((f) => {
+        if (f) {
+          this.addFromLibrary(f);
+        }
+      });
+  }
+
+  addFromLibrary(f: UploadedFileItem): void {
+    void this.session
+      .openRemotePdf(f.document_id, f.filename, { append: true })
       .then(() => this.cdr.markForCheck());
   }
 

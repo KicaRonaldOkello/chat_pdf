@@ -57,6 +57,48 @@ $scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
   flex: 1 1 auto;
 }
 
+.main__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+:host ::ng-deep .lumen-header-btn.mat-mdc-outlined-button {
+  --mdc-outlined-button-label-text-color: #{$lumen-on-surface};
+  --mdc-outlined-button-outline-color: rgba(0, 0, 0, 0.2);
+  line-height: 1.5;
+  padding: 0 0.9rem;
+  min-height: 2.25rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  border-radius: 0.375rem;
+  letter-spacing: 0.02em;
+}
+
+:host ::ng-deep .lumen-header-btn .mdc-button__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+:host ::ng-deep .add-pdf-source-menu {
+  .mat-mdc-menu-item {
+    min-height: 2.75rem;
+  }
+  .add-pdf-source-menu__row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+  }
+  .add-pdf-source-menu__row .material-symbols-outlined {
+    font-size: 1.15rem;
+    color: $lumen-zinc-500;
+  }
+}
+
 .main__body {
   flex: 1 1 auto;
   min-height: 0;
@@ -204,28 +246,19 @@ $scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
 }
 
 .pdf-doc-tabs__add {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  align-self: center;
-  padding: 0.4rem 0.6rem;
+  min-width: 0 !important;
+  padding: 0 0.4rem !important;
   margin: 0 0.2rem 0.15rem 0.25rem;
-  border: none;
-  border-radius: 0.25rem;
-  background: transparent;
-  color: $lumen-zinc-500;
-  cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
+  align-self: center;
+  --mdc-outlined-button-container-height: 1.9rem;
 }
 
-.pdf-doc-tabs__add:hover,
-.pdf-doc-tabs__add:focus-visible {
-  color: $lumen-on-surface;
-  background: $lumen-surface-low;
+:host ::ng-deep .pdf-doc-tabs__add.lumen-header-btn {
+  min-height: 1.9rem;
 }
 
-.pdf-doc-tabs__add .material-symbols-outlined {
-  font-size: 20px;
+:host ::ng-deep .pdf-doc-tabs__add .mdc-button__label .material-symbols-outlined {
+  font-size: 1.1rem;
 }
 
 .pdf-frame-wrap {
@@ -251,3 +284,4 @@ $scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
   border-left: none;
   background: $lumen-surface-low;
 }
+

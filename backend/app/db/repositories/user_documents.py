@@ -67,3 +67,15 @@ class UserDocumentRepository:
         await self._session.execute(
             delete(UserDocument).where(UserDocument.document_id == document_id)
         )
+
+    async def is_owner(self, clerk_user_id: str, document_id: str) -> bool:
+        stmt = (
+            select(UserDocument.document_id)
+            .where(
+                UserDocument.clerk_user_id == clerk_user_id,
+                UserDocument.document_id == document_id,
+            )
+            .limit(1)
+        )
+        result = await self._session.execute(stmt)
+        return result.first() is not None

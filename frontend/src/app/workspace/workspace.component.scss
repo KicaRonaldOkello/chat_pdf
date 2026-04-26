@@ -60,6 +60,48 @@ $scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
   flex: 1 1 auto;
 }
 
+.main__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+:host ::ng-deep .lumen-header-btn.mat-mdc-outlined-button {
+  --mdc-outlined-button-label-text-color: #{$lumen-on-surface};
+  --mdc-outlined-button-outline-color: rgba(0, 0, 0, 0.2);
+  line-height: 1.5;
+  padding: 0 0.9rem;
+  min-height: 2.25rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  border-radius: 0.375rem;
+  letter-spacing: 0.02em;
+}
+
+:host ::ng-deep .lumen-header-btn .mdc-button__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+:host ::ng-deep .add-pdf-source-menu {
+  .mat-mdc-menu-item {
+    min-height: 2.75rem;
+  }
+  .add-pdf-source-menu__row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+  }
+  .add-pdf-source-menu__row .material-symbols-outlined {
+    font-size: 1.15rem;
+    color: $lumen-zinc-500;
+  }
+}
+
 .main__body {
   flex: 1 1 auto;
   min-height: 0;
@@ -284,9 +326,18 @@ a.lumen-recent__link:hover {
   border: 1px solid transparent;
   border-radius: 0.5rem; /* rounded-lg */
   box-shadow: $scholarly-shadow;
+  cursor: pointer;
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;
+}
+.lumen-recent__row:focus-visible {
+  outline: 2px solid $lumen-primary;
+  outline-offset: 2px;
+}
+.lumen-recent__row--busy {
+  cursor: wait;
+  pointer-events: none;
 }
 
 .lumen-recent__row:hover,
@@ -326,6 +377,10 @@ a.lumen-recent__link:hover {
 .lumen-recent__thumb .material-symbols-outlined {
   font-size: 1.5rem;
   color: $lumen-zinc-400;
+}
+.lumen-recent__thumb .mat-mdc-progress-spinner {
+  display: block;
+  margin: 0;
 }
 
 .lumen-recent__text {
@@ -482,3 +537,4 @@ a.lumen-recent__link:hover {
   border-left: none;
   background: $lumen-surface-low;
 }
+

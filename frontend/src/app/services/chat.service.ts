@@ -71,6 +71,18 @@ export class ChatService {
     return this.http.get<DocumentStatus>(`${this.base}/documents/${documentId}/status`);
   }
 
+  /** Authenticated PDF bytes (owner must match DB). */
+  getDocumentFileBlob(documentId: string): Observable<Blob> {
+    return from(this.buildBearerHeaders()).pipe(
+      switchMap((headers) =>
+        this.http.get(`${this.base}/documents/${documentId}/file`, {
+          headers,
+          responseType: 'blob'
+        })
+      )
+    );
+  }
+
   searchDocument(
     documentId: string,
     query: string,

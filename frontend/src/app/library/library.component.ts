@@ -3,10 +3,13 @@ import { ChangeDetectorRef, Component, effect, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { ClerkService } from 'ngx-clerk';
 
 import { UploadedFileItem } from '../interfaces';
 import { ChatService } from '../services/chat.service';
+import { DocumentSessionService } from '../services/document-session.service';
 import { MainChromeService } from '../services/main-chrome.service';
 import { formatBytesBase2OrDash } from '../util/format-bytes';
 
@@ -14,7 +17,7 @@ type SortBy = 'date' | 'size' | 'name';
 
 @Component({
   selector: 'app-library',
-  imports: [CommonModule, MatButtonModule, MatIconModule],
+  imports: [CommonModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatTooltipModule],
   templateUrl: './library.component.html',
   styleUrl: './library.component.scss'
 })
@@ -22,6 +25,7 @@ export class LibraryComponent {
   private readonly chrome = inject(MainChromeService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly chat = inject(ChatService);
+  protected readonly session = inject(DocumentSessionService);
   protected readonly clerk = inject(ClerkService);
 
   files: UploadedFileItem[] = [];
@@ -85,6 +89,24 @@ export class LibraryComponent {
   }
 
   formatSize = formatBytesBase2OrDash;
+
+  openFile(f: UploadedFileItem): void {
+    if (this.session.uploading) {
+      return;
+    }
+    void this.session.openRemotePdf(f.document_id, f.filename);
+  }
+
+  /** Add this upload to the current workspace, or start a new one if nothing is open. */
+  addToWorkspace(f: UploadedFileItem, ev: Event): void {
+    ev.stopPropagation();
+    if (this.session.uploading) {
+      return;
+    }
+    void this.session.openRemotePdf(f.document_id, f.filename, {
+      append: this.session.openDocuments.length > 0
+    });
+  }
 
   private async loadFiles(): Promise<void> {
     if (!this.clerk.isLoaded() || !this.clerk.isSignedIn()) {

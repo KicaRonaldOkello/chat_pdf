@@ -1,0 +1,36 @@
+<div class="lumen-lib-dlg" role="dialog" aria-labelledby="lumen-lib-dlg-title">
+  <h2 id="lumen-lib-dlg-title" class="lumen-lib-dlg__title">Add from library</h2>
+  <p class="lumen-lib-dlg__sub">Select a PDF you have already uploaded. Files already in this workspace are hidden.</p>
+
+  <div class="lumen-lib-dlg__body">
+    @if (loading) {
+      <div class="lumen-lib-dlg__state" aria-live="polite">
+        <mat-progress-spinner mode="indeterminate" diameter="36" />
+        <span>Loading your files…</span>
+      </div>
+    } @else if (loadError) {
+      <p class="lumen-lib-dlg__err" role="alert">{{ loadError }}</p>
+    } @else if (files.length === 0) {
+      <p class="lumen-lib-dlg__empty">No other files to add. Upload more from the Home or Batch page first.</p>
+    } @else {
+      <ul class="lumen-lib-dlg__list" role="listbox" aria-label="Your uploads">
+        @for (f of files; track f.document_id) {
+          <li role="option">
+            <button
+              type="button"
+              class="lumen-lib-dlg__row"
+              (click)="pick(f)"
+            >
+              <span class="material-symbols-outlined lumen-lib-dlg__row-icon" aria-hidden="true">description</span>
+              <span class="lumen-lib-dlg__row-text">{{ f.filename }}</span>
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+
+  <div class="lumen-lib-dlg__actions">
+    <button mat-stroked-button type="button" class="lumen-header-btn" (click)="cancel()">Cancel</button>
+  </div>
+</div>

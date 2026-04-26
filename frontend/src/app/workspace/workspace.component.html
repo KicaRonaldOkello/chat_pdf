@@ -28,8 +28,39 @@
   <h1 class="main__title">{{ mainTitle }}</h1>
   @if (session.documentId && session.pdfData) {
     <span class="main__header-spacer"></span>
-    <button mat-button type="button" color="primary" (click)="triggerAddPdf()">Add PDF</button>
-    <button mat-button type="button" color="primary" (click)="clearDocument()">Close all</button>
+    <div class="main__header-actions">
+      <button
+        mat-stroked-button
+        type="button"
+        class="lumen-header-btn"
+        [matMenuTriggerFor]="addPdfSourceMenu"
+        aria-haspopup="menu"
+        aria-label="Add PDF, choose source"
+      >
+        <span class="material-symbols-outlined" aria-hidden="true">add</span>
+        Add PDF
+        <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
+      </button>
+      <mat-menu #addPdfSourceMenu="matMenu" class="add-pdf-source-menu">
+        <button mat-menu-item type="button" (click)="triggerAddPdf()">
+          <span class="add-pdf-source-menu__row">
+            <span class="material-symbols-outlined" aria-hidden="true">upload_file</span>
+            From this device
+          </span>
+        </button>
+        @if (clerk.isSignedIn()) {
+          <button mat-menu-item type="button" (click)="openLibraryDialog()">
+            <span class="add-pdf-source-menu__row">
+              <span class="material-symbols-outlined" aria-hidden="true">library_books</span>
+              From library
+            </span>
+          </button>
+        }
+      </mat-menu>
+      <button mat-stroked-button type="button" class="lumen-header-btn" (click)="clearDocument()">
+        Close all
+      </button>
+    </div>
   }
 </header>
 
@@ -112,10 +143,22 @@
           </div>
           <ul class="lumen-recent__list" role="list">
             @for (doc of recentDocuments; track doc.documentId) {
-              <li class="lumen-recent__row" role="listitem">
+              <li
+                class="lumen-recent__row"
+                [class.lumen-recent__row--busy]="session.activeRemoteOpenId === doc.documentId"
+                [attr.aria-busy]="session.activeRemoteOpenId === doc.documentId ? 'true' : null"
+                role="listitem"
+                tabindex="0"
+                (click)="openRecentDocument(doc)"
+                (keydown.enter)="openRecentDocument(doc)"
+              >
                 <div class="lumen-recent__row-main">
                   <div class="lumen-recent__thumb" aria-hidden="true">
-                    <span class="material-symbols-outlined">description</span>
+                    @if (session.activeRemoteOpenId === doc.documentId) {
+                      <mat-spinner diameter="24" />
+                    } @else {
+                      <span class="material-symbols-outlined">description</span>
+                    }
                   </div>
                   <div class="lumen-recent__text">
                     <h3 class="lumen-recent__name">{{ doc.name }}</h3>
@@ -128,7 +171,7 @@
                     class="lumen-recent__action"
                     aria-label="Open in new"
                     title="Open document"
-                    (click)="$event.stopPropagation()"
+                    (click)="openRecentDocument(doc); $event.stopPropagation()"
                   >
                     <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
                   </button>

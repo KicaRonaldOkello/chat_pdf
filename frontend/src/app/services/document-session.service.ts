@@ -1,10 +1,13 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { DestroyRef, inject, Injectable, OnDestroy } from '@angular/core';
+import { Router } from '@angular/router';
 import { catchError, firstValueFrom, forkJoin, of, Subject } from 'rxjs';
 
 import {
   CHAT_RAIL_DEFAULT,
   CHAT_RAIL_MIN,
   CHAT_RAIL_STORAGE_KEY,
+  MAX_PDF_UPLOAD_BYTES,
   PDF_MIN,
   STATUS_POLL_MS
 } from '../constants/const';
@@ -17,6 +20,7 @@ export class DocumentSessionService implements OnDestroy {
   onSessionChange?: () => void;
   private readonly chatService = inject(ChatService);
   private readonly notify = inject(LumenNotifyService);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private statusPollTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly jumpSource$ = new Subject<RetrievedSource>();
@@ -31,6 +35,12 @@ export class DocumentSessionService implements OnDestroy {
   currentStage: string | null = null;
   expandedTrustFor: number | null = null;
   uploading = false;
+  /**
+   * `documentId` of a file open from the server (Home recent / Library) while
+   * the blob is fetched, so list rows can show a spinner. Cleared in finally;
+   * compare `documentId` before nulling in case a second open overlapped.
+   */
+  activeRemoteOpenId: string | null = null;
   sending = false;
   chatRailWidthPx = CHAT_RAIL_DEFAULT;
   private shouldScroll = false;
@@ -154,10 +164,95 @@ export class DocumentSessionService implements OnDestroy {
     send();
   }
 
+  /**
+   * Load a PDF the user already uploaded.
+   * - `append: false` (default): new session, one document, go to Home (`/app`).
+   * - `append: true`: add to the open set; if there are 2+ documents, go to Research (`/app/research`).
+   *   Chat history is kept when appending.
+   */
+  async openRemotePdf(
+    documentId: string,
+    filename: string,
+    options?: { append?: boolean }
+  ): Promise<void> {
+    const append = options?.append === true;
+    if (append && this.openDocuments.some((d) => d.id === documentId)) {
+      this.activeDocumentId = documentId;
+      this.notify.warning('That document is already open in this workspace.', 3000);
+      this.onSessionChange?.();
+      return;
+    }
+    this.uploading = true;
+    this.activeRemoteOpenId = documentId;
+    this.onSessionChange?.();
+    try {
+      const blob = await firstValueFrom(this.chatService.getDocumentFileBlob(documentId));
+      const buffer = await blob.arrayBuffer();
+      let status: DocumentStatus | null = null;
+      try {
+        status = await firstValueFrom(this.chatService.getStatus(documentId));
+      } catch {
+        /* poller will refresh */
+      }
+      const newDoc: OpenDocument = {
+        id: documentId,
+        filename,
+        data: buffer,
+        status:
+          status ?? {
+            document_id: documentId,
+            status: 'queued',
+            stage: 'queued',
+            progress: 0,
+            filename
+          }
+      };
+
+      if (append && this.openDocuments.length > 0) {
+        this.openDocuments = [...this.openDocuments, newDoc];
+      } else {
+        this.stopStatusPolling();
+        this.shownStatusWarningKeys.clear();
+        this.messages = [];
+        this.messageMeta = {};
+        this.userInput = '';
+        this.expandedTrustFor = null;
+        this.openDocuments = [newDoc];
+      }
+      this.activeDocumentId = documentId;
+      this.startStatusPolling();
+      this.onSessionChange?.();
+      if (this.openDocuments.length > 1) {
+        void this.router.navigate(['/app/research']);
+      } else {
+        void this.router.navigate(['/app']);
+      }
+    } catch (e: unknown) {
+      if (e instanceof HttpErrorResponse) {
+        if (e.status === 403) {
+          this.notify.error('You do not have access to this document.', 5000);
+        } else if (e.status === 404) {
+          this.notify.error('Document not found.', 5000);
+        } else {
+          this.notify.error(e.message || 'Could not open document', 5000);
+        }
+      } else {
+        this.notify.error('Could not open document', 5000);
+      }
+    } finally {
+      this.uploading = false;
+      if (this.activeRemoteOpenId === documentId) {
+        this.activeRemoteOpenId = null;
+      }
+      this.onSessionChange?.();
+    }
+  }
+
   clearSession(): void {
     this.stopStatusPolling();
     this.shownStatusWarningKeys.clear();
     this.pendingSourceJump = null;
+    this.activeRemoteOpenId = null;
     this.openDocuments = [];
     this.activeDocumentId = null;
     this.messages = [];
@@ -271,17 +366,32 @@ export class DocumentSessionService implements OnDestroy {
       );
       files = [files[0]!];
     }
+    this.activeRemoteOpenId = null;
     this.uploading = true;
-    const append = opts.mode === 'batch' ? opts.append : false;
-    let effectiveAppend = append;
+    const wantAppend = opts.append;
+    let hasUploadedInThisRun = false;
     let uploaded = 0;
     try {
       for (const file of files) {
+        if (file.size > MAX_PDF_UPLOAD_BYTES) {
+          this.notify.error(
+            `${file.name}: each PDF must be at most ${MAX_PDF_UPLOAD_BYTES / (1024 * 1024)} MB.`,
+            6000
+          );
+          continue;
+        }
         const bufferPromise = file.arrayBuffer();
         let res: { document_id: string };
         try {
           res = await firstValueFrom(this.chatService.uploadPdf(file));
         } catch (err: unknown) {
+          if (err instanceof HttpErrorResponse && err.status === 413) {
+            this.notify.error(
+              `${file.name}: file is too large (max ${MAX_PDF_UPLOAD_BYTES / (1024 * 1024)} MB).`,
+              6000
+            );
+            continue;
+          }
           const http = err as { error?: { detail?: string } };
           const msg =
             http?.error?.detail ?? (err instanceof Error ? err.message : 'Upload failed');
@@ -295,7 +405,7 @@ export class DocumentSessionService implements OnDestroy {
           this.notify.error(`Could not read: ${file.name}`);
           continue;
         }
-        if (!effectiveAppend) {
+        if (!wantAppend && !hasUploadedInThisRun) {
           this.stopStatusPolling();
           this.messages = [];
           this.openDocuments = [];
@@ -313,7 +423,7 @@ export class DocumentSessionService implements OnDestroy {
           }
         });
         this.activeDocumentId = res.document_id;
-        effectiveAppend = true;
+        hasUploadedInThisRun = true;
         uploaded++;
         this.onSessionChange?.();
       }
@@ -323,6 +433,9 @@ export class DocumentSessionService implements OnDestroy {
           3200
         );
         this.startStatusPolling();
+        if (this.openDocuments.length > 1) {
+          void this.router.navigate(['/app/research']);
+        }
       }
     } finally {
       this.uploading = false;

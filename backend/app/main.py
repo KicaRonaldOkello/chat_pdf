@@ -16,7 +16,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from app import store
+import app.runtime as app_runtime
+from app import document_data, s3_storage
 from app.api.chat import chat_stream_ndjson
 from app.api.documents import search_hits_to_results
 from app.api.schemas import (
@@ -30,12 +31,15 @@ from app.auth.claims import email_from_claims
 from app.auth.clerk_jwt import get_optional_clerk_session, require_clerk_session
 from app.config import (
     ANSWERER_MODEL,
+    DATABASE_URL,
     EMBEDDING_MODEL,
     GUARDRAIL_MODEL,
     JUDGE_MODEL,
+    MAX_PDF_UPLOAD_BYTES,
     METADATA_OPENROUTER_MODEL,
     OPENROUTER_BASE_URL,
     ROUTER_MODEL,
+    S3_BUCKET,
 )
 from app.db import close_db_engine, open_db_engine
 from app.db.dependencies import get_user_document_repository, get_user_repository
@@ -51,15 +55,21 @@ from app.processing.vectorstore import search as vector_search
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    if not S3_BUCKET:
+        raise RuntimeError("S3_BUCKET is empty; set S3_BUCKET in the environment.")
+    if not (DATABASE_URL or "").strip():
+        raise RuntimeError(
+            "DATABASE_URL is required: document state (status, tree, meta) is stored in PostgreSQL."
+        )
     opened = await open_db_engine()
-    if opened is not None:
-        _app.state.db_engine, _app.state.async_session_maker = opened
-    else:
-        _app.state.db_engine = None
-        _app.state.async_session_maker = None
+    if opened is None:
+        raise RuntimeError("Failed to open the database engine (check DATABASE_URL).")
+    _app.state.db_engine, _app.state.async_session_maker = opened
+    app_runtime.db_session_maker = _app.state.async_session_maker
     try:
         yield
     finally:
+        app_runtime.db_session_maker = None
         await close_db_engine(getattr(_app.state, "db_engine", None))
         _app.state.db_engine = None
         _app.state.async_session_maker = None
@@ -180,9 +190,9 @@ async def list_recent_documents(
     ]
 
 
-def _store_display_for_uploaded(doc_id: str) -> tuple[str, str]:
+async def _store_display_for_uploaded(doc_id: str) -> tuple[str, str]:
     """Return (processing_status, display_status) for library UI chips."""
-    s = store.get_status(doc_id)
+    s = await document_data.get_status(doc_id)
     if s is None:
         return "unknown", "unknown"
     st = s.status
@@ -199,7 +209,7 @@ async def list_uploaded_files(
     claims: dict[str, Any] = Depends(require_clerk_session),
     limit: int = Query(200, ge=1, le=500),
 ) -> list[UploadedFileItem]:
-    """All PDFs recorded for the signed-in user (newest first from DB; status from disk)."""
+    """All PDFs recorded for the signed-in user (newest first; processing status from Postgres)."""
     sub = claims.get("sub")
     if not isinstance(sub, str):
         raise HTTPException(
@@ -209,7 +219,7 @@ async def list_uploaded_files(
     rows = await user_doc_repo.list_for_user(sub, limit)
     out: list[UploadedFileItem] = []
     for r in rows:
-        raw, disp = _store_display_for_uploaded(r.document_id)
+        raw, disp = await _store_display_for_uploaded(r.document_id)
         out.append(
             UploadedFileItem(
                 document_id=r.document_id,
@@ -221,6 +231,53 @@ async def list_uploaded_files(
             )
         )
     return out
+
+
+@app.get("/api/documents/{doc_id}/file", tags=["documents"])
+async def get_document_pdf_file(
+    doc_id: str,
+    user_doc_repo: UserDocumentRepository = Depends(get_user_document_repository),
+    claims: dict[str, Any] = Depends(require_clerk_session),
+) -> StreamingResponse:
+    """Stream the PDF for a document the user owns from S3."""
+    sub = claims.get("sub")
+    if not isinstance(sub, str):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token missing `sub`",
+        )
+    if not await user_doc_repo.is_owner(sub, doc_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not allowed for this document",
+        )
+    st = await document_data.get_status(doc_id)
+    if st is None:
+        raise HTTPException(status_code=404, detail="Unknown document_id")
+    filename = (st.filename or "document.pdf").replace('"', "")
+
+    from botocore.exceptions import ClientError
+
+    try:
+        obj = s3_storage.get_object_streaming(doc_id)
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code in ("404", "NoSuchKey", "NotFound"):
+            raise HTTPException(
+                status_code=404, detail="PDF not found in storage"
+            ) from e
+        raise HTTPException(
+            status_code=502, detail="Could not read PDF from storage"
+        ) from e
+
+    def stream() -> Any:
+        yield from obj["Body"].iter_chunks(chunk_size=65_536)
+
+    return StreamingResponse(
+        stream(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
 
 
 @app.post("/api/upload", response_model=UploadResponse)
@@ -235,8 +292,14 @@ async def upload_pdf(
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Empty file")
+    if len(data) > MAX_PDF_UPLOAD_BYTES:
+        mb = MAX_PDF_UPLOAD_BYTES // (1024 * 1024)
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"PDF must be at most {mb} MB",
+        )
 
-    doc_id = store.save_upload(data, file.filename)
+    doc_id = await document_data.save_upload_to_s3_and_db(data, file.filename)
     await _record_user_upload(request, claims, doc_id, file.filename, len(data))
     background_tasks.add_task(process_document, doc_id)
     return UploadResponse(
@@ -246,7 +309,7 @@ async def upload_pdf(
 
 @app.get("/api/documents/{doc_id}/status", response_model=StatusResponse)
 async def document_status(doc_id: str) -> StatusResponse:
-    s = store.get_status(doc_id)
+    s = await document_data.get_status(doc_id)
     if s is None:
         raise HTTPException(status_code=404, detail="Unknown document_id")
     return StatusResponse(
@@ -263,7 +326,7 @@ async def document_status(doc_id: str) -> StatusResponse:
 
 @app.get("/api/documents/{doc_id}/tree")
 async def document_tree(doc_id: str) -> JSONResponse:
-    t = store.get_tree(doc_id)
+    t = await document_data.get_tree(doc_id)
     if t is None:
         raise HTTPException(status_code=404, detail="Tree not available yet")
     return JSONResponse(content=t)
@@ -271,7 +334,7 @@ async def document_tree(doc_id: str) -> JSONResponse:
 
 @app.get("/api/documents/{doc_id}/sections")
 async def document_sections(doc_id: str) -> JSONResponse:
-    idx = store.get_sections_index(doc_id)
+    idx = await document_data.get_sections_index(doc_id)
     if idx is None:
         raise HTTPException(status_code=404, detail="Sections index not available yet")
     return JSONResponse(content=idx)
@@ -279,7 +342,7 @@ async def document_sections(doc_id: str) -> JSONResponse:
 
 @app.get("/api/documents/{doc_id}/meta")
 async def document_meta(doc_id: str) -> JSONResponse:
-    m = store.get_document_meta(doc_id)
+    m = await document_data.get_document_meta(doc_id)
     if m is None:
         raise HTTPException(status_code=404, detail="Document meta not available yet")
     return JSONResponse(content=m)
@@ -287,12 +350,14 @@ async def document_meta(doc_id: str) -> JSONResponse:
 
 @app.get("/api/documents/{doc_id}/traces")
 async def document_traces(doc_id: str) -> JSONResponse:
-    return JSONResponse(content=store.list_traces(doc_id))
+    return JSONResponse(
+        content=await document_data.list_traces(doc_id)
+    )
 
 
 @app.post("/api/documents/{doc_id}/search")
 async def document_search(doc_id: str, body: SearchRequest) -> JSONResponse:
-    status = store.get_status(doc_id)
+    status = await document_data.get_status(doc_id)
     if status is None:
         raise HTTPException(status_code=404, detail="Unknown document_id")
     if status.status != "ready":
@@ -333,7 +398,11 @@ async def delete_document(request: Request, doc_id: str) -> dict[str, str]:
         await vectorstore.delete_doc(doc_id)
     except Exception:
         pass
-    store.delete_document(doc_id)
+    try:
+        s3_storage.delete_all_for_document(doc_id)
+    except Exception:
+        pass
+    await document_data.delete_document_artifacts(doc_id)
     await _delete_user_document_row(request, doc_id)
     return {"status": "deleted", "document_id": doc_id}
 

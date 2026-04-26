@@ -126,3 +126,11 @@ CLERK_JWT_AUDIENCE: str | None = os.getenv("CLERK_JWT_AUDIENCE", "").strip() or 
 
 # PostgreSQL (e.g. postgresql://lumen:lumen@127.0.0.1:5432/lumen) — `docker compose` in backend/
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+
+# S3: PDF storage (`documents/{doc_id}/source.pdf`). Uses default boto3 credentials chain (e.g. AWS_PROFILE).
+S3_BUCKET = os.getenv("S3_BUCKET", "").strip()
+S3_KEY_PREFIX = os.getenv("S3_KEY_PREFIX", "documents").strip().strip("/") or "documents"
+# Optional; boto3 also reads AWS_DEFAULT_REGION
+AWS_REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "")).strip() or "us-east-1"
+# Hard cap for POST /api/upload (5 MiB by default)
+MAX_PDF_UPLOAD_BYTES = int(os.getenv("MAX_PDF_UPLOAD_BYTES", str(5 * 1024 * 1024)))

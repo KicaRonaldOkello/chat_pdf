@@ -10,7 +10,7 @@ from app.db.base import Base
 
 
 class UserDocument(Base):
-    """One row per uploaded `document_id` in the filesystem store, scoped to a Clerk user."""
+    """One row per upload (recents / library), scoped to a Clerk user; links to `document_id`."""
 
     __tablename__ = "user_documents"
     __table_args__ = (Index("ix_user_documents_clerk_user_uploaded", "clerk_user_id", "uploaded_at"),)

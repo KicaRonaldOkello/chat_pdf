@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 from pydantic import ValidationError
 
-from app import store
+from app import document_data
 from app.agents.clients import openrouter_json
 from app.agents.state import GraphState, RouterPlan
 from app.config import ROUTER_MODEL, ROUTER_REQUEST_TIMEOUT
@@ -77,7 +77,7 @@ def compact_meta(meta: dict[str, Any] | None) -> str:
     return "\n".join(bits)
 
 
-def render_user(state: GraphState, *, avoid_route: str | None = None) -> str:
+async def render_user(state: GraphState, *, avoid_route: str | None = None) -> str:
     doc_ids = scope_document_ids(state)
     history = state.get("history") or []
     chat = "\n".join(f"{m['role']}: {m['content']}" for m in history[-4:])
@@ -89,9 +89,9 @@ def render_user(state: GraphState, *, avoid_route: str | None = None) -> str:
     )
     parts: list[str] = []
     for did in doc_ids:
-        entries = store.get_sections_index(did) or []
-        meta = store.get_document_meta(did)
-        st = store.get_status(did)
+        entries = (await document_data.get_sections_index(did)) or []
+        meta = await document_data.get_document_meta(did)
+        st = await document_data.get_status(did)
         label = st.filename if st and st.filename else did
         parts.append(
             f"---\ndocument_id: {did}\n"
@@ -108,11 +108,11 @@ def render_user(state: GraphState, *, avoid_route: str | None = None) -> str:
     )
 
 
-def fallback_heuristic(state: GraphState) -> RouterPlan:
+async def fallback_heuristic(state: GraphState) -> RouterPlan:
     qnorm = state["query"].lower()
     qwords = {w for w in qnorm.replace("?", " ").split() if len(w) > 3}
     for did in scope_document_ids(state):
-        entries = store.get_sections_index(did) or []
+        entries = (await document_data.get_sections_index(did)) or []
         hits: list[str] = []
         for e in entries:
             nt = e.get("normalized_title") or normalize_title(e.get("title", ""))
@@ -149,11 +149,11 @@ async def run(state: GraphState) -> dict[str, Any]:
             client,
             model=ROUTER_MODEL,
             system=SYSTEM,
-            user=render_user(state, avoid_route=avoid_route),
+            user=await render_user(state, avoid_route=avoid_route),
             timeout=ROUTER_REQUEST_TIMEOUT,
         )
 
-    plan = fallback_heuristic(state)
+    plan = await fallback_heuristic(state)
     if isinstance(parsed, dict):
         try:
             plan = RouterPlan.model_validate(parsed)

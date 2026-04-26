@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from app import store
+from app import document_data
 from app.agents.state import GraphState
 from app.config import (
     RERANK_ENABLED,
@@ -19,8 +19,8 @@ def scope_document_ids(state: GraphState) -> list[str]:
     return [state["document_id"]]
 
 
-def display_filename(doc_id: str) -> str:
-    s = store.get_status(doc_id)
+async def display_filename(doc_id: str) -> str:
+    s = await document_data.get_status(doc_id)
     if s and (s.filename or "").strip():
         return s.filename.strip()
     return doc_id
@@ -34,7 +34,7 @@ def structural_max_chunks() -> int:
     return min(64, RERANK_RECALL_LIMIT) if RERANK_ENABLED else 30
 
 
-def structural_paths_by_document(
+async def structural_paths_by_document(
     state: GraphState, plan: dict[str, Any]
 ) -> dict[str, list[str]]:
     doc_ids = scope_document_ids(state)
@@ -44,14 +44,14 @@ def structural_paths_by_document(
         if ":" in s:
             head, tail = s.split(":", 1)
             if head in out:
-                entries = store.get_sections_index(head) or []
+                entries = (await document_data.get_sections_index(head)) or []
                 by_id = {e["id"]: e for e in entries}
                 e = by_id.get(tail)
                 if e and e.get("path"):
                     out[head].append(e["path"])
                     continue
         for d in doc_ids:
-            entries = store.get_sections_index(d) or []
+            entries = (await document_data.get_sections_index(d)) or []
             by_id = {e["id"]: e for e in entries}
             e = by_id.get(s)
             if e and e.get("path"):
@@ -61,7 +61,7 @@ def structural_paths_by_document(
 
 async def structural(state: GraphState, plan: dict[str, Any]) -> list[dict[str, Any]]:
     cap = structural_max_chunks()
-    paths_by_doc = structural_paths_by_document(state, plan)
+    paths_by_doc = await structural_paths_by_document(state, plan)
     if not paths_by_doc:
         return []
     if len(paths_by_doc) == 1:
@@ -111,7 +111,7 @@ async def hybrid(state: GraphState, plan: dict[str, Any]) -> list[dict[str, Any]
     return merged[: max(cap, len(struct_hits) + 4)]
 
 
-def format_context(hits: list[dict[str, Any]]) -> str:
+async def format_context(hits: list[dict[str, Any]]) -> str:
     if not hits:
         return ""
     key_order: list[tuple[str, str]] = []
@@ -134,7 +134,8 @@ def format_context(hits: list[dict[str, Any]]) -> str:
                 -float(r.get("rerank_score", r.get("_score", 0)) or 0),
             )
         )
-        head = f"## {display_filename(did)} — {sp}"
+        label = await display_filename(did)
+        head = f"## {label} — {sp}"
         blocks.append(head)
         for r in rows:
             header = f"[p.{r.get('page', '?')}]"
@@ -172,7 +173,7 @@ async def run(state: GraphState) -> dict[str, Any]:
         hits = hits[:RETRIEVAL_TOP_K]
         rerank_info = None
 
-    context = format_context(hits)
+    context = await format_context(hits)
     step: dict[str, Any] = {
         "node": "retrieve",
         "duration_ms": int((time.time() - t0) * 1000),

@@ -13,7 +13,10 @@
 <div class="main__body lumen-lib">
   <div class="lumen-lib__inner">
     @if (!clerk.isLoaded() || loading) {
-      <p class="lumen-lib__state">Loading…</p>
+      <div class="lumen-lib__state lumen-lib__state--spinner" role="status" aria-live="polite">
+        <mat-spinner diameter="32" />
+        <span class="lumen-lib__state-text">Loading…</span>
+      </div>
     } @else if (clerk.isLoaded() && !clerk.isSignedIn()) {
       <p class="lumen-lib__state">Sign in to see the PDFs you have uploaded.</p>
     } @else if (loadError) {
@@ -22,7 +25,7 @@
       <section class="lumen-recent-files" aria-labelledby="lumen-recent-files-title">
         <div class="lumen-recent-files__toolbar">
           <div class="lumen-recent-files__title-rail">
-            <h2 id="lumen-recent-files-title" class="lumen-recent-files__title">Recent Files</h2>
+            <h2 id="lumen-recent-files-title" class="lumen-recent-files__title">Files</h2>
             <div class="lumen-recent-files__title-line" aria-hidden="true"></div>
           </div>
           <div class="lumen-recent-files__filter">
@@ -52,14 +55,29 @@
               <div class="lumen-recent-files__col lumen-recent-files__col--date" role="columnheader">Modified</div>
               <div class="lumen-recent-files__col lumen-recent-files__col--size" role="columnheader">Size</div>
               <div class="lumen-recent-files__col lumen-recent-files__col--status" role="columnheader">Status</div>
+              <div class="lumen-recent-files__col lumen-recent-files__col--actions" role="columnheader" aria-label="Add to workspace">Add</div>
             </div>
             <ul class="lumen-recent-files__rows" role="list">
               @for (f of sortedFiles; track f.document_id) {
-                <li class="lumen-recent-files__row" role="row">
+                <li
+                  class="lumen-recent-files__row lumen-recent-files__row--clickable"
+                  [class.lumen-recent-files__row--busy]="session.activeRemoteOpenId === f.document_id"
+                  [attr.aria-busy]="session.activeRemoteOpenId === f.document_id ? 'true' : null"
+                  role="row"
+                  tabindex="0"
+                  (click)="openFile(f)"
+                  (keydown.enter)="openFile(f)"
+                >
                   <div class="lumen-recent-files__col lumen-recent-files__col--name" role="cell">
-                    <span class="material-symbols-outlined lumen-recent-files__row-icon" aria-hidden="true">{{
-                      rowIcon(f.filename)
-                    }}</span>
+                    @if (session.activeRemoteOpenId === f.document_id) {
+                      <span class="lumen-recent-files__row-spinner" aria-hidden="true">
+                        <mat-spinner diameter="22" />
+                      </span>
+                    } @else {
+                      <span class="material-symbols-outlined lumen-recent-files__row-icon" aria-hidden="true">{{
+                        rowIcon(f.filename)
+                      }}</span>
+                    }
                     <div class="lumen-recent-files__name-block">
                       <span class="lumen-recent-files__name">{{ f.filename }}</span>
                       <p class="lumen-recent-files__meta-inline lumen-recent-files__muted">
@@ -103,6 +121,28 @@
                         }
                       }
                     </span>
+                  </div>
+                  <div
+                    class="lumen-recent-files__col lumen-recent-files__col--actions"
+                    role="cell"
+                    (click)="$event.stopPropagation()"
+                    (keydown)="$event.stopPropagation()"
+                  >
+                    <button
+                      mat-icon-button
+                      type="button"
+                      class="lumen-recent-files__add-ws"
+                      [matTooltip]="
+                        session.openDocuments.length > 0
+                          ? 'Add to current workspace (multi-doc chat)'
+                          : 'Open in workspace'
+                      "
+                      matTooltipShowDelay="300"
+                      aria-label="Add to workspace"
+                      (click)="addToWorkspace(f, $event)"
+                    >
+                      <span class="material-symbols-outlined" aria-hidden="true">library_add</span>
+                    </button>
                   </div>
                 </li>
               }

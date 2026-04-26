@@ -34,9 +34,15 @@ MULTI_SUFFIX = (
 
 
 def build_messages(state: GraphState) -> list[dict[str, str]]:
-    system = SYSTEM_BASE
-    if state.get("document_ids") and len(state["document_ids"]) > 1:
-        system = SYSTEM_BASE + MULTI_SUFFIX
+    doc_ids = state.get("document_ids")
+    if doc_ids and len(doc_ids) > 1:
+        system = (
+            f"The user has {len(doc_ids)} PDF(s) in this chat. Use the retrieved "
+            f"excerpts from any or all of them to answer, including cross-document "
+            f"comparisons and common themes. "
+        ) + SYSTEM_BASE + MULTI_SUFFIX
+    else:
+        system = SYSTEM_BASE
     system += (
         "\n\n--- retrieved context ---\n"
         f"{state.get('context') or '(no context retrieved)'}\n"

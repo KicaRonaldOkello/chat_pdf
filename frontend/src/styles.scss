@@ -8,6 +8,21 @@ body { margin: 0; font-family: Inter, system-ui, sans-serif; }
   margin: 0 1rem 1.5rem !important;
 }
 
+.cdk-overlay-pane.lumen-library-dialog-panel .mat-mdc-dialog-container {
+  padding: 1.25rem 1.25rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e4e4e7;
+  box-shadow: 0 24px 48px -12px rgba(26, 28, 28, 0.12);
+  background: #fff;
+}
+
+/* Lumen: Material spinners (mat-spinner / mat-progress-spinner) in black */
+.mat-mdc-progress-spinner {
+  --mdc-circular-progress-active-indicator-color: #1a1a1a;
+  --mdc-circular-progress-color: #1a1a1a;
+  --mdc-circular-progress-track-color: rgba(0, 0, 0, 0.12);
+}
+
 @media (min-width: 768px) {
   .cdk-overlay-pane.lumen-snack-host {
     margin-left: calc(256px + 1.5rem) !important;

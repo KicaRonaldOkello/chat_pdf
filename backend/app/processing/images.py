@@ -10,6 +10,7 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
+from app import s3_storage
 from app.config import (
     OPENROUTER_API_KEY,
     OPENROUTER_BASE_URL,
@@ -92,9 +93,11 @@ def render_images(
                     pix = fitz.Pixmap(doc, xref)
                     if pix.n - pix.alpha >= 4:
                         pix = fitz.Pixmap(fitz.csRGB, pix)
-                    out_path = out_dir / f"p{page_num:04d}_{i:02d}.png"
-                    pix.save(out_path)
+                    rel_name = f"p{page_num:04d}_{i:02d}.png"
+                    out_path = out_dir / rel_name
+                    pix.save(str(out_path))
                     pix = None
+                    png_bytes = out_path.read_bytes()
                 except Exception:
                     continue
                 results.append(
@@ -102,7 +105,8 @@ def render_images(
                         "page": page_num,
                         "bbox": [float(b) for b in bbox],
                         "page_size": page_size,
-                        "path": str(out_path),
+                        "rel_name": rel_name,
+                        "png_bytes": png_bytes,
                     }
                 )
     finally:
@@ -133,11 +137,12 @@ def parse_caption_json(raw: str) -> VisionCaption:
 
 async def caption_one(
     client: httpx.AsyncClient,
-    image_path: Path,
+    image_bytes: bytes,
 ) -> VisionCaption:
     try:
-        b = image_path.read_bytes()
-        data_url = f"data:image/png;base64,{base64.b64encode(b).decode()}"
+        if not image_bytes:
+            return VisionCaption.empty()
+        data_url = f"data:image/png;base64,{base64.b64encode(image_bytes).decode()}"
     except Exception:
         return VisionCaption.empty()
 
@@ -211,18 +216,28 @@ def find_section_for_page(root: Section, page: int) -> Section:
 
 async def enrich_images(
     pdf_file: Path,
-    images_out_dir: Path,
+    document_id: str,
     placeholders: list[ElementRef],
     root: Section,
     el_id_start: int,
 ) -> None:
-    figs = await asyncio.to_thread(render_images, pdf_file, images_out_dir)
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="chatpdf-img-") as tmp:
+        out_dir = Path(tmp)
+        figs = await asyncio.to_thread(render_images, pdf_file, out_dir)
     if not figs:
         for image_placeholder in [p for p in placeholders if p.type == "image"]:
             image_placeholder.extra.setdefault("path", "")
             image_placeholder.extra.setdefault("caption", image_placeholder.text)
             image_placeholder.extra.setdefault("description", "")
         return
+
+    for fig in figs:
+        key = s3_storage.put_image_bytes(
+            document_id, fig["rel_name"], fig["png_bytes"]
+        )
+        fig["s3_key"] = key
 
     image_placeholders = [p for p in placeholders if p.type == "image"]
     used_ids: set[str] = set()
@@ -244,7 +259,7 @@ async def enrich_images(
             sec.elements.append(ph)
             placeholders.append(ph)
         used_ids.add(ph.id)
-        ph.extra["path"] = fig["path"]
+        ph.extra["path"] = str(fig.get("s3_key", ""))
         pairings.append((ph, fig))
 
     if not OPENROUTER_API_KEY:
@@ -255,7 +270,7 @@ async def enrich_images(
 
     async with httpx.AsyncClient() as client:
         results = await asyncio.gather(
-            *[caption_one(client, Path(fig["path"])) for _, fig in pairings]
+            *[caption_one(client, fig["png_bytes"]) for _, fig in pairings]
         )
     for (ph, _), caption in zip(pairings, results, strict=False):
         ph.extra["caption"] = caption.caption or ph.text

@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any, cast
 
-from app import store
+from app import document_data
 from app.agents.graph import get_graph
 from app.agents.nodes.answerer import on_token_var
 from app.agents.state import GraphState
@@ -20,7 +20,7 @@ def nd(obj: dict[str, Any]) -> bytes:
 
 async def chat_stream_ndjson(body: ChatRequest) -> AsyncIterator[bytes]:
     doc_ids = resolve_chat_document_ids(body)
-    not_ready = readiness_error_for_documents(doc_ids)
+    not_ready = await readiness_error_for_documents(doc_ids)
     if not_ready is not None:
         yield nd({"type": "error", "message": not_ready})
         return
@@ -98,7 +98,7 @@ async def chat_stream_ndjson(body: ChatRequest) -> AsyncIterator[bytes]:
         "final_route": final_state.get("final_route", "answer"),
     }
     try:
-        store.append_trace(primary, trace)
+        await document_data.append_trace(primary, trace)
     except Exception:
         pass
 

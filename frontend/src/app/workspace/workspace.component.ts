@@ -15,6 +15,8 @@ import { firstValueFrom } from 'rxjs';
 import { ClerkService } from 'ngx-clerk';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
@@ -22,7 +24,11 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 
 import { LumenChatPanelComponent } from '../lumen-chat-panel/lumen-chat-panel.component';
-import { RecentDocumentItem } from '../interfaces';
+import {
+  LibraryPickerDialogComponent,
+  LibraryPickerDialogData
+} from '../library-picker-dialog/library-picker-dialog.component';
+import { RecentDocumentItem, UploadedFileItem } from '../interfaces';
 import { formatBytesBase2 } from '../util/format-bytes';
 import { ChatService } from '../services/chat.service';
 import { PdfViewerComponent } from '../pdf-viewer/pdf-viewer.component';
@@ -36,6 +42,7 @@ import { MainChromeService } from '../services/main-chrome.service';
     CommonModule,
     RouterLink,
     MatButtonModule,
+    MatMenuModule,
     MatIconModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
@@ -53,6 +60,7 @@ export class WorkspaceComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly chrome = inject(MainChromeService);
   private readonly chat = inject(ChatService);
+  private readonly dialog = inject(MatDialog);
   protected readonly clerk = inject(ClerkService);
   /** Prior `DocumentSessionService.onSessionChange` (e.g. app shell), restored on destroy. */
   private previousSessionChange?: () => void;
@@ -197,8 +205,9 @@ export class WorkspaceComponent implements OnInit, AfterViewInit, OnDestroy {
     // Snapshot before clearing: `input.files` is a live list emptied by `input.value = ''`.
     const fileArray = input.files ? Array.from(input.files) : [];
     input.value = '';
+    const hasOpen = this.session.openDocuments.length > 0;
     void this.session
-      .uploadPdfsFromFiles(fileArray, { mode: 'single', append: false })
+      .uploadPdfsFromFiles(fileArray, { mode: 'batch', append: hasOpen })
       .then(() => this.cdr.markForCheck());
   }
 
@@ -207,7 +216,10 @@ export class WorkspaceComponent implements OnInit, AfterViewInit, OnDestroy {
     const fileArray = input.files ? Array.from(input.files) : [];
     input.value = '';
     void this.session
-      .uploadPdfsFromFiles(fileArray, { mode: 'single', append: false })
+      .uploadPdfsFromFiles(fileArray, {
+        mode: 'batch',
+        append: this.session.openDocuments.length > 0
+      })
       .then(() => this.cdr.markForCheck());
   }
 
@@ -244,8 +256,9 @@ export class WorkspaceComponent implements OnInit, AfterViewInit, OnDestroy {
     if (all.length > 0 && pdfs.length < all.length) {
       this.notify.warning('Only PDF files are accepted; extra files were skipped.', 5000);
     }
+    const hasOpen = this.session.openDocuments.length > 0;
     void this.session
-      .uploadPdfsFromFiles(pdfs, { mode: 'single', append: false })
+      .uploadPdfsFromFiles(pdfs, { mode: 'batch', append: hasOpen })
       .then(() => this.cdr.markForCheck());
   }
 
@@ -264,7 +277,48 @@ export class WorkspaceComponent implements OnInit, AfterViewInit, OnDestroy {
     document.addEventListener('mouseup', this.onSplitResizeEnd, true);
   }
 
+  openRecentDocument(doc: { documentId: string; name: string }): void {
+    if (this.session.uploading) {
+      return;
+    }
+    void this.session.openRemotePdf(doc.documentId, doc.name);
+  }
+
   clearDocument(): void {
     this.session.clearSession();
+    void this.router.navigate(['/app']);
+  }
+
+  openLibraryDialog(): void {
+    if (!this.clerk.isLoaded() || !this.clerk.isSignedIn()) {
+      return;
+    }
+    const data: LibraryPickerDialogData = {
+      openDocumentIds: this.session.openDocuments.map((d) => d.id)
+    };
+    this.dialog
+      .open<LibraryPickerDialogComponent, LibraryPickerDialogData, UploadedFileItem | undefined>(
+        LibraryPickerDialogComponent,
+        {
+          data,
+          width: 'min(420px, 92vw)',
+          maxWidth: '95vw',
+          autoFocus: 'first-heading',
+          panelClass: 'lumen-library-dialog-panel'
+        }
+      )
+      .afterClosed()
+      .subscribe((f) => {
+        if (f) {
+          this.addFromLibrary(f);
+        }
+      });
+  }
+
+  addFromLibrary(f: UploadedFileItem): void {
+    const append = this.session.openDocuments.length > 0;
+    void this.session
+      .openRemotePdf(f.document_id, f.filename, { append })
+      .then(() => this.cdr.markForCheck());
   }
 }

@@ -7,6 +7,23 @@
   (change)="onAddFileSelected($event)"
 />
 
+<mat-menu #addPdfSourceMenu="matMenu" class="add-pdf-source-menu">
+  <button mat-menu-item type="button" (click)="triggerAddPdf()">
+    <span class="add-pdf-source-menu__row">
+      <span class="material-symbols-outlined" aria-hidden="true">upload_file</span>
+      From this device
+    </span>
+  </button>
+  @if (clerk.isSignedIn()) {
+    <button mat-menu-item type="button" (click)="openLibraryDialog()">
+      <span class="add-pdf-source-menu__row">
+        <span class="material-symbols-outlined" aria-hidden="true">library_books</span>
+        From library
+      </span>
+    </button>
+  }
+</mat-menu>
+
 <header class="main__header research-header">
   <button
     mat-icon-button
@@ -20,8 +37,23 @@
   <h1 class="main__title">{{ mainTitle }}</h1>
   @if (session.documentId && session.pdfData) {
     <span class="main__header-spacer"></span>
-    <button mat-button type="button" color="primary" (click)="triggerAddPdf()">Add PDF</button>
-    <button mat-button type="button" color="primary" (click)="clearAll()">Close all</button>
+    <div class="main__header-actions">
+      <button
+        mat-stroked-button
+        type="button"
+        class="lumen-header-btn"
+        [matMenuTriggerFor]="addPdfSourceMenu"
+        aria-haspopup="menu"
+        aria-label="Add PDF, choose source"
+      >
+        <span class="material-symbols-outlined" aria-hidden="true">add</span>
+        Add PDF
+        <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
+      </button>
+      <button mat-stroked-button type="button" class="lumen-header-btn" (click)="clearAll()">
+        Close all
+      </button>
+    </div>
   }
 </header>
 
@@ -56,7 +88,14 @@
               </button>
             </div>
           }
-          <button type="button" class="pdf-doc-tabs__add" aria-label="Add PDF" (click)="triggerAddPdf()">
+          <button
+            type="button"
+            mat-stroked-button
+            class="lumen-header-btn pdf-doc-tabs__add"
+            [matMenuTriggerFor]="addPdfSourceMenu"
+            aria-label="Add PDF, choose source"
+            aria-haspopup="menu"
+          >
             <span class="material-symbols-outlined" aria-hidden="true">add</span>
           </button>
         </div>
