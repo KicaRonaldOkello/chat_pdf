@@ -1,0 +1,253 @@
+// Lumen workspace — SCSS (no Tailwind). Inter + Newsreader; Material Symbols in template.
+
+$lumen-bg: #f9f9f9;
+$lumen-on-surface: #1a1c1c;
+$lumen-secondary: #5e5e5e;
+$lumen-zinc-200: #e4e4e7;
+$lumen-zinc-400: #a1a1aa;
+$lumen-zinc-500: #71717a;
+$lumen-surface-low: #f3f3f4;
+$lumen-surface-container: #eeeeee;
+$lumen-surface-lowest: #ffffff;
+$lumen-outline-variant: #c6c6c6;
+$lumen-on-primary: #e2e2e2;
+$lumen-primary: #000000;
+$lumen-primary-container: #3b3b3b;
+$scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  font-family: Inter, system-ui, sans-serif;
+  color: $lumen-on-surface;
+  background: $lumen-bg;
+}
+.research-fallback { padding: 1rem; color: $lumen-zinc-500; }
+
+.main__header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 56px;
+  padding: 0 0.75rem 0 0.25rem;
+  background: rgba($lumen-bg, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid $lumen-zinc-200;
+}
+
+.main__sidebar-toggle {
+  flex-shrink: 0;
+}
+
+.main__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: $lumen-on-surface;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.main__header-spacer {
+  flex: 1 1 auto;
+}
+
+.main__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* ---- Split PDF + chat ---- */
+.shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell--split {
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.split-resizer {
+  flex: 0 0 8px;
+  width: 8px;
+  z-index: 2;
+  cursor: col-resize;
+  align-self: stretch;
+  background: transparent;
+  position: relative;
+  touch-action: none;
+  user-select: none;
+}
+
+.split-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: rgba($lumen-outline-variant, 0.45);
+  border-radius: 1px;
+  transition: background 0.15s ease, width 0.15s ease;
+}
+
+.split-resizer:hover::after,
+.split-resizer--dragging::after {
+  background: rgba(0, 0, 0, 0.35);
+  width: 3px;
+}
+
+.split-resizer:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
+
+.pdf-pane {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+.pdf-doc-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0;
+  padding: 0 0.5rem;
+  border-bottom: 1px solid rgba($lumen-zinc-200, 0.8);
+  background: rgba(255, 255, 255, 0.6);
+  min-height: 2.75rem;
+}
+
+.pdf-doc-tabs__item {
+  display: flex;
+  align-items: center;
+  max-width: 14rem;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.pdf-doc-tabs__item--active {
+  border-bottom-color: $lumen-primary;
+  background: #fff;
+  color: $lumen-on-surface;
+}
+
+.pdf-doc-tabs__tab {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 0.6rem 0.35rem 0.6rem 0.75rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: $lumen-zinc-500;
+  text-align: left;
+}
+
+.pdf-doc-tabs__item--active .pdf-doc-tabs__tab {
+  color: $lumen-on-surface;
+  font-weight: 500;
+}
+
+.pdf-doc-tabs__label {
+  display: block;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pdf-doc-tabs__close {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.5rem 0.25rem 0.15rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: $lumen-zinc-500;
+  opacity: 0.4;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.pdf-doc-tabs__item:hover .pdf-doc-tabs__close,
+.pdf-doc-tabs__close:hover,
+.pdf-doc-tabs__close:focus-visible {
+  opacity: 1;
+  color: $lumen-on-surface;
+}
+
+.pdf-doc-tabs__close .material-symbols-outlined {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+}
+
+.pdf-doc-tabs__add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  padding: 0.4rem 0.6rem;
+  margin: 0 0.2rem 0.15rem 0.25rem;
+  border: none;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: $lumen-zinc-500;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.pdf-doc-tabs__add:hover,
+.pdf-doc-tabs__add:focus-visible {
+  color: $lumen-on-surface;
+  background: $lumen-surface-low;
+}
+
+.pdf-doc-tabs__add .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.pdf-frame-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  background: #fff;
+}
+
+.pdf-frame-wrap app-pdf-viewer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.chat-rail {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: none;
+  background: $lumen-surface-low;
+}

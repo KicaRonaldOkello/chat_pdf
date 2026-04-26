@@ -1,0 +1,729 @@
+// Lumen workspace — SCSS (no Tailwind). Inter + Newsreader; Material Symbols in template.
+
+$lumen-bg: #f9f9f9;
+$lumen-on-surface: #1a1c1c;
+$lumen-secondary: #5e5e5e;
+$lumen-zinc-200: #e4e4e7;
+$lumen-zinc-400: #a1a1aa;
+$lumen-zinc-500: #71717a;
+$lumen-surface-low: #f3f3f4;
+$lumen-surface-container: #eeeeee;
+$lumen-surface-lowest: #ffffff;
+$lumen-outline-variant: #c6c6c6;
+$lumen-on-primary: #e2e2e2;
+$lumen-primary: #000000;
+$lumen-primary-container: #3b3b3b;
+$scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
+
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.chat-rail {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: none;
+  background: $lumen-surface-low;
+}
+
+.chat-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+}
+
+.lumen-chat__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid rgba($lumen-outline-variant, 0.25);
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.chat-panel__title {
+  margin: 0;
+  font-family: Newsreader, Georgia, serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: $lumen-on-surface;
+}
+
+.lumen-chat__kicker {
+  margin: 0.15rem 0 0;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: $lumen-zinc-500;
+}
+
+.lumen-chat__head-icon {
+  font-size: 1.5rem;
+  color: $lumen-zinc-400;
+}
+
+.chat-panel__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.lumen-chat__messages {
+  background: transparent;
+}
+
+.chat-panel__composer {
+  flex: 0 0 auto;
+  padding: 1rem 1.25rem 1.25rem;
+  border-top: 1px solid rgba($lumen-outline-variant, 0.25);
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.lumen-chat__input-card {
+  border: 1px solid rgba($lumen-outline-variant, 0.25);
+  border-radius: 0.5rem;
+  background: #fff;
+  overflow: visible;
+}
+
+.chat-input-card__context {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba($lumen-outline-variant, 0.2);
+  background: rgba(0, 0, 0, 0.02);
+  min-width: 0;
+}
+
+.chat-input-card__context-symbol {
+  font-size: 1.125rem;
+  color: $lumen-zinc-500;
+  flex-shrink: 0;
+}
+
+.chat-input-card__context-name {
+  font-size: 0.8125rem;
+  color: rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.lumen-chat__field-wrap {
+  position: relative;
+}
+
+.chat-input-card__field {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 1rem 3rem 1rem 1rem;
+  border: none;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.87);
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  resize: none;
+  min-height: 100px;
+}
+
+.chat-input-card__field::placeholder {
+  color: rgba(0, 0, 0, 0.38);
+}
+
+.chat-input-card__field:focus {
+  outline: none;
+}
+
+.chat-input-card__field:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lumen-chat__send {
+  position: absolute;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  padding: 0.35rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #000;
+  line-height: 1;
+}
+
+.lumen-chat__send:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.lumen-chat__send .material-symbols-outlined {
+  font-size: 1.375rem;
+}
+
+.lumen-chat__hint {
+  margin: 0.75rem 0 0;
+  font-size: 9px;
+  font-style: italic;
+  text-align: center;
+  color: $lumen-zinc-400;
+}
+
+.chat-panel .messages {
+  flex: 1 1 auto;
+  min-height: 80px;
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Bubbles — Lumen styling */
+.lumen-bubble {
+  box-sizing: border-box;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+}
+
+.lumen-bubble.user {
+  align-self: flex-end;
+  max-width: 90%;
+  background: #000;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.lumen-bubble.assistant {
+  align-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.65);
+  border-color: rgba($lumen-outline-variant, 0.12);
+  color: $lumen-on-surface;
+}
+
+.lumen-bubble.user .role {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.lumen-bubble.assistant .role {
+  color: $lumen-zinc-400;
+}
+
+.lumen-bubble.user .content,
+.lumen-bubble.user .content.markdown-body {
+  color: #fff;
+}
+
+.lumen-bubble.user .content.markdown-body a {
+  color: #93c5fd;
+}
+
+.lumen-bubble .content--waiting {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.875rem;
+}
+
+.lumen-bubble.user .content--waiting {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.lumen-bubble.assistant .content--waiting {
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.content--waiting-label {
+  font-weight: 500;
+}
+
+.thinking-bubbles {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.thinking-bubbles__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.45;
+  animation: thinking-bubble 1.05s ease-in-out infinite;
+}
+
+.thinking-bubbles__dot:nth-child(2) {
+  animation-delay: 0.14s;
+}
+
+.thinking-bubbles__dot:nth-child(3) {
+  animation-delay: 0.28s;
+}
+
+@keyframes thinking-bubble {
+  0%,
+  70%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+
+  35% {
+    transform: translateY(-5px);
+    opacity: 1;
+  }
+}
+
+.bubble .role,
+.lumen-bubble .role {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.35rem;
+}
+
+.bubble .content,
+.lumen-bubble .content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.bubble .content.markdown-body,
+.lumen-bubble .content.markdown-body {
+  white-space: normal;
+}
+
+.bubble .content.markdown-body :first-child,
+.lumen-bubble .content.markdown-body :first-child {
+  margin-top: 0;
+}
+
+.bubble .content.markdown-body :last-child,
+.lumen-bubble .content.markdown-body :last-child {
+  margin-bottom: 0;
+}
+
+.bubble .content.markdown-body p,
+.lumen-bubble .content.markdown-body p {
+  margin: 0 0 0.65em;
+}
+
+.bubble .content.markdown-body h1,
+.bubble .content.markdown-body h2,
+.bubble .content.markdown-body h3,
+.bubble .content.markdown-body h4,
+.lumen-bubble .content.markdown-body h1,
+.lumen-bubble .content.markdown-body h2,
+.lumen-bubble .content.markdown-body h3,
+.lumen-bubble .content.markdown-body h4 {
+  margin: 0.75em 0 0.4em;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.bubble .content.markdown-body h1,
+.lumen-bubble .content.markdown-body h1 {
+  font-size: 1.1rem;
+}
+
+.bubble .content.markdown-body h2,
+.lumen-bubble .content.markdown-body h2 {
+  font-size: 1.05rem;
+}
+
+.bubble .content.markdown-body h3,
+.bubble .content.markdown-body h4,
+.lumen-bubble .content.markdown-body h3,
+.lumen-bubble .content.markdown-body h4 {
+  font-size: 1rem;
+}
+
+.bubble .content.markdown-body ul,
+.bubble .content.markdown-body ol,
+.lumen-bubble .content.markdown-body ul,
+.lumen-bubble .content.markdown-body ol {
+  margin: 0.35em 0 0.65em;
+  padding-left: 1.35rem;
+}
+
+.bubble .content.markdown-body li,
+.lumen-bubble .content.markdown-body li {
+  margin: 0.2em 0;
+}
+
+.bubble .content.markdown-body blockquote,
+.lumen-bubble .content.markdown-body blockquote {
+  margin: 0.5em 0;
+  padding: 0.35em 0 0.35em 0.75em;
+  border-left: 3px solid rgba(0, 0, 0, 0.2);
+}
+
+.lumen-bubble.user .content.markdown-body blockquote {
+  border-left-color: rgba(255, 255, 255, 0.35);
+}
+
+.bubble .content.markdown-body pre,
+.lumen-bubble .content.markdown-body pre {
+  margin: 0.5em 0;
+  padding: 0.55rem 0.65rem;
+  overflow-x: auto;
+  font-size: 0.84em;
+  line-height: 1.4;
+  border-radius: 8px;
+}
+
+.lumen-bubble.user .content.markdown-body pre {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.lumen-bubble.assistant .content.markdown-body pre {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.bubble .content.markdown-body code,
+.lumen-bubble .content.markdown-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+.lumen-bubble.user .content.markdown-body code {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.lumen-bubble.assistant .content.markdown-body code {
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.bubble .content.markdown-body pre code,
+.lumen-bubble .content.markdown-body pre code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.bubble .content.markdown-body a,
+.lumen-bubble .content.markdown-body a {
+  word-break: break-word;
+}
+
+.bubble .content.markdown-body hr,
+.lumen-bubble .content.markdown-body hr {
+  margin: 0.75em 0;
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.lumen-bubble.user .content.markdown-body hr {
+  border-top-color: rgba(255, 255, 255, 0.2);
+}
+
+.bubble .content.markdown-body table,
+.lumen-bubble .content.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 0.9em;
+}
+
+.bubble .content.markdown-body th,
+.bubble .content.markdown-body td,
+.lumen-bubble .content.markdown-body th,
+.lumen-bubble .content.markdown-body td {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  padding: 0.35em 0.5em;
+  text-align: left;
+}
+
+.lumen-bubble.user .content.markdown-body th,
+.lumen-bubble.user .content.markdown-body td {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.bubble .content.markdown-body th,
+.lumen-bubble .content.markdown-body th {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.lumen-bubble.user .content.markdown-body th {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.placeholder-page {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.placeholder-page__title {
+  margin: 0;
+  font-family: Newsreader, Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.placeholder-page__text {
+  margin: 0 0 0.5rem;
+  max-width: 360px;
+  color: $lumen-secondary;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.processing-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.8rem;
+  margin: 0 0 0.5rem;
+  background: $lumen-surface-low;
+  border: 1px solid $lumen-outline-variant;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  color: $lumen-secondary;
+
+  .material-symbols-outlined {
+    font-size: 18px;
+    color: #b83030;
+  }
+}
+
+.processing-banner__text {
+  flex: 1 1 auto;
+  line-height: 1.3;
+}
+
+// ----- Trust panel (agent provenance, judge verdict, retrieved sources) -----
+.trust {
+  margin-top: 0.5rem;
+  border-top: 1px dashed $lumen-outline-variant;
+  padding-top: 0.45rem;
+}
+
+.trust__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.2rem 0.5rem;
+  background: transparent;
+  border: 1px solid $lumen-outline-variant;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  color: $lumen-secondary;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+
+  &:hover {
+    background: $lumen-surface-low;
+  }
+}
+
+.trust__icon,
+.trust__chevron {
+  font-size: 16px;
+}
+
+.trust__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.trust__score,
+.trust__route {
+  color: $lumen-secondary;
+}
+
+.trust-badge {
+  display: inline-block;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: $lumen-surface-low;
+  color: $lumen-secondary;
+}
+
+.trust-badge--pass {
+  background: rgba(34, 139, 34, 0.12);
+  color: #246b24;
+}
+
+.trust-badge--warn {
+  background: rgba(217, 119, 6, 0.14);
+  color: #8a4b00;
+}
+
+.trust-badge--reject {
+  background: rgba(184, 48, 48, 0.14);
+  color: #8c1d1d;
+}
+
+.trust__panel {
+  margin-top: 0.5rem;
+  padding: 0.6rem 0.7rem;
+  background: $lumen-surface-low;
+  border: 1px solid $lumen-outline-variant;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  color: $lumen-on-surface;
+  line-height: 1.35;
+}
+
+.trust__row {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 0.6rem;
+  margin-bottom: 0.45rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.trust__row--concerns .trust__label {
+  align-self: start;
+}
+
+.trust__label {
+  font-weight: 600;
+  color: $lumen-secondary;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+}
+
+.trust__val,
+.trust__concerns,
+.trust__sources {
+  margin: 0;
+}
+
+.trust__concerns {
+  padding-left: 1rem;
+  list-style: disc;
+}
+
+.trust__sources {
+  padding-left: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.trust__sources > li {
+  margin: 0;
+}
+
+.trust__source {
+  display: block;
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
+}
+
+.trust__source--locatable:hover {
+  background: rgba(25, 118, 210, 0.06);
+  border-color: rgba(25, 118, 210, 0.25);
+}
+
+.trust__source--locatable:focus-visible {
+  outline: none;
+  background: rgba(25, 118, 210, 0.08);
+  border-color: rgba(25, 118, 210, 0.55);
+}
+
+.trust__source--locatable:active {
+  transform: translateY(1px);
+}
+
+.trust__source:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.trust__source-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 600;
+}
+
+.trust__section {
+  color: $lumen-on-surface;
+}
+
+.trust__page {
+  color: $lumen-secondary;
+}
+
+.trust__type {
+  padding: 0 0.35rem;
+  border-radius: 4px;
+  background: rgba(20, 20, 20, 0.06);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: $lumen-secondary;
+}
+
+.trust__jump {
+  margin-left: auto;
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  color: rgba(25, 118, 210, 0.75);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.trust__source--locatable:hover .trust__jump,
+.trust__source--locatable:focus-visible .trust__jump {
+  opacity: 1;
+}
+
+.trust__preview {
+  display: block;
+  color: $lumen-secondary;
+  font-weight: 400;
+  margin-top: 0.15rem;
+}

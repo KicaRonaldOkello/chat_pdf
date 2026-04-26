@@ -1,0 +1,40 @@
+/* You can add global styles to this file, and also import other style files */
+
+html, body { height: 100%; }
+body { margin: 0; font-family: Inter, system-ui, sans-serif; }
+
+/* Lumen snackbar overlay: clear app sidebar + bottom margin */
+.cdk-overlay-pane.lumen-snack-host {
+  margin: 0 1rem 1.5rem !important;
+}
+
+@media (min-width: 768px) {
+  .cdk-overlay-pane.lumen-snack-host {
+    margin-left: calc(256px + 1.5rem) !important;
+  }
+}
+
+.mat-mdc-snack-bar-container.lumen-snack-host {
+  --mat-snack-bar-container-color: transparent;
+  --mat-snack-bar-supporting-text-color: inherit;
+  padding: 0;
+  min-width: auto;
+  max-width: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.mat-mdc-snack-bar-container.lumen-snack-host .mdc-snackbar__surface {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined', sans-serif;
+  font-style: normal;
+  font-weight: 300;
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+  line-height: 1;
+  display: inline-block;
+}

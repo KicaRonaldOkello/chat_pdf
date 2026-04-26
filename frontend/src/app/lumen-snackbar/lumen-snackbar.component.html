@@ -1,0 +1,20 @@
+<div
+  class="lumen-snack"
+  [ngClass]="{
+    'lumen-snack--success': data.variant === 'success',
+    'lumen-snack--warning': data.variant === 'warning',
+    'lumen-snack--error': data.variant === 'error'
+  }"
+  role="status"
+  [attr.aria-live]="data.variant === 'error' ? 'assertive' : 'polite'"
+>
+  <span
+    class="material-symbols-outlined lumen-snack__icon"
+    [class.lumen-snack__icon--success]="data.variant === 'success'"
+    [class.lumen-snack__icon--warning]="data.variant === 'warning'"
+    [class.lumen-snack__icon--error]="data.variant === 'error'"
+    aria-hidden="true"
+    >{{ iconName() }}</span
+  >
+  <p class="lumen-snack__message">{{ data.message }}</p>
+</div>

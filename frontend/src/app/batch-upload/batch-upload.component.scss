@@ -1,0 +1,389 @@
+// Lumen workspace — SCSS (no Tailwind). Inter + Newsreader; Material Symbols in template.
+
+$lumen-bg: #f9f9f9;
+$lumen-on-surface: #1a1c1c;
+$lumen-secondary: #5e5e5e;
+$lumen-zinc-200: #e4e4e7;
+$lumen-zinc-400: #a1a1aa;
+$lumen-zinc-500: #71717a;
+$lumen-surface-low: #f3f3f4;
+$lumen-surface-container: #eeeeee;
+$lumen-surface-lowest: #ffffff;
+$lumen-outline-variant: #c6c6c6;
+$lumen-on-primary: #e2e2e2;
+$lumen-primary: #000000;
+$lumen-primary-container: #3b3b3b;
+$scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
+
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  font-family: Inter, system-ui, sans-serif;
+  color: $lumen-on-surface;
+  background: $lumen-bg;
+}
+
+/* ---- Main (header row) ---- */
+.main.lumen-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: $lumen-bg;
+}
+
+.main__header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 56px;
+  padding: 0 0.75rem 0 0.25rem;
+  background: rgba($lumen-bg, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid $lumen-zinc-200;
+}
+
+.main__sidebar-toggle {
+  flex-shrink: 0;
+}
+
+.main__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: $lumen-on-surface;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.main__header-spacer {
+  flex: 1 1 auto;
+}
+
+/* ---- Batch upload page ---- */
+.lumen-batch {
+  max-width: 75rem;
+  margin: 0 auto;
+  padding: 1.5rem 0 0;
+}
+
+.lumen-batch-hero {
+  display: grid;
+  grid-template-columns: 1fr minmax(12rem, 16rem);
+  gap: 2rem;
+  align-items: end;
+  margin-bottom: 2.5rem;
+}
+
+.lumen-batch-hero__eyebrow {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: $lumen-secondary;
+  margin-bottom: 0.75rem;
+}
+
+.lumen-batch-hero__title {
+  margin: 0 0 1.25rem;
+  font-family: Newsreader, Georgia, serif;
+  font-size: clamp(2.25rem, 4.5vw, 3.75rem);
+  font-weight: 500;
+  line-height: 1.1;
+  color: $lumen-on-surface;
+
+  em {
+    font-style: italic;
+  }
+}
+
+.lumen-batch-hero__lead {
+  margin: 0;
+  max-width: 36rem;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: $lumen-on-surface;
+  opacity: 0.9;
+}
+
+.lumen-batch-hero__stat {
+  background: $lumen-surface-low;
+  border: 1px solid rgba($lumen-outline-variant, 0.2);
+  border-radius: 0.5rem;
+  padding: 1.5rem 1.75rem;
+  text-align: right;
+}
+
+.lumen-batch-hero__stat-value {
+  font-family: Newsreader, Georgia, serif;
+  font-size: 2.25rem;
+  font-style: italic;
+  line-height: 1.1;
+  color: $lumen-on-surface;
+}
+
+.lumen-batch-hero__stat-label {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: $lumen-secondary;
+}
+
+.lumen-batch-hero__cta {
+  margin-top: 1.25rem;
+  width: 100%;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 0.6rem 1rem;
+  font-family: Inter, system-ui, sans-serif;
+  border: 1px solid #000;
+  border-radius: 0;
+  background: #000;
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.lumen-batch-hero__cta:hover:not(:disabled) {
+  background: #1f1f1f;
+  border-color: #1f1f1f;
+}
+
+.lumen-batch-hero__cta:disabled {
+  background: #b8b8b8;
+  border-color: #b8b8b8;
+  color: #f3f3f3;
+  cursor: not-allowed;
+}
+
+.lumen-batch-drop {
+  min-height: 16rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  margin-bottom: 2.5rem;
+  border: 2px dashed rgba($lumen-outline-variant, 0.85);
+  border-radius: 0.5rem;
+  background: rgba($lumen-surface-lowest, 0.5);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.lumen-batch-drop--active,
+.lumen-batch-drop:hover {
+  border-color: $lumen-primary;
+}
+
+.lumen-batch-drop__icon {
+  font-size: 2.5rem;
+  color: $lumen-zinc-500;
+  margin-bottom: 1rem;
+  transition: color 0.2s ease;
+}
+
+.lumen-batch-drop--active .lumen-batch-drop__icon,
+.lumen-batch-drop:hover .lumen-batch-drop__icon {
+  color: $lumen-primary;
+}
+
+.lumen-batch-drop__title {
+  margin: 0 0 0.5rem;
+  font-family: Newsreader, Georgia, serif;
+  font-size: 1.4rem;
+  font-weight: 500;
+  text-align: center;
+  color: $lumen-on-surface;
+
+  em {
+    font-style: italic;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+}
+
+.lumen-batch-drop__hint {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: $lumen-zinc-500;
+  text-align: center;
+}
+
+.lumen-batch__columns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem 2.5rem;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .lumen-batch-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .lumen-batch__columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lumen-batch-col__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid rgba($lumen-outline-variant, 0.25);
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.lumen-batch-col__title {
+  margin: 0;
+  font-family: Newsreader, Georgia, serif;
+  font-size: 1.15rem;
+  font-style: italic;
+  font-weight: 500;
+  color: $lumen-on-surface;
+}
+
+.lumen-batch-col__count {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: $lumen-zinc-500;
+}
+
+.lumen-batch-col__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.lumen-batch-col__empty {
+  font-size: 0.8rem;
+  color: $lumen-zinc-500;
+  padding: 0.25rem 0;
+}
+
+.lumen-queue-card {
+  padding: 1rem 1.25rem;
+  background: $lumen-surface-lowest;
+  border-left: 2px solid $lumen-primary-container;
+}
+
+.lumen-queue-card--ready {
+  border-left-color: $lumen-secondary;
+}
+
+.lumen-queue-card--done {
+  border-left-color: $lumen-outline-variant;
+  opacity: 0.9;
+}
+
+.lumen-queue-card--progress {
+  .lumen-queue-card__spin {
+    animation: lumen-spin 1.2s linear infinite;
+  }
+}
+
+@keyframes lumen-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.lumen-queue-card__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.lumen-queue-card--ready .lumen-queue-card__row,
+.lumen-queue-card--done .lumen-queue-card__row {
+  margin-bottom: 0;
+}
+
+.lumen-queue-card__name {
+  display: block;
+  font-family: Newsreader, Georgia, serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: $lumen-on-surface;
+}
+
+.lumen-queue-card__sub {
+  margin: 0.4rem 0 0;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: $lumen-secondary;
+}
+
+.lumen-queue-card__bar {
+  height: 2px;
+  background: $lumen-surface-container;
+  border-radius: 1px;
+  margin-bottom: 0.4rem;
+  overflow: hidden;
+}
+
+.lumen-queue-card__bar-fill {
+  height: 100%;
+  background: $lumen-primary;
+  min-width: 0;
+  transition: width 0.3s ease;
+}
+
+.lumen-queue-card__meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: $lumen-zinc-500;
+}
+
+.lumen-queue-card__ok {
+  color: $lumen-secondary;
+  font-size: 1.1rem;
+}
+
+.lumen-batch__footnote {
+  margin: 1.5rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba($lumen-outline-variant, 0.2);
+  font-size: 11px;
+  line-height: 1.5;
+  color: $lumen-secondary;
+  font-style: italic;
+}
+
+
+.batch-page { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; }
+.batch-page__header { flex-shrink: 0; }
+.workspace-home__scroll { flex: 1; min-height: 0; overflow: auto; padding: 0 1.5rem 2.5rem; }
+

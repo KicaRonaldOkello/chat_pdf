@@ -1,0 +1,183 @@
+<div class="chat-panel lumen-chat">
+  <header class="chat-panel__header lumen-chat__head">
+    <div>
+      <h2 class="chat-panel__title">Chat</h2>
+      <p class="lumen-chat__kicker">AI Assistant</p>
+    </div>
+    <span class="material-symbols-outlined lumen-chat__head-icon" aria-hidden="true">auto_awesome</span>
+  </header>
+
+  <div class="chat-panel__scroll">
+    <div #messagesScroll class="messages lumen-chat__messages">
+      @for (m of session.messages; track $index) {
+        <div class="bubble lumen-bubble" [class.user]="m.role === 'user'" [class.assistant]="m.role === 'assistant'">
+          <span class="role">{{ session.messageRoleLabel(m.role) }}</span>
+          @if (m.role === 'assistant') {
+            @if (m.content.trim() || !(session.sending && $index === session.messages.length - 1)) {
+              <div class="content markdown-body" [innerHTML]="m.content | markdown"></div>
+            } @else if (session.sending && $index === session.messages.length - 1) {
+              <div class="content content--waiting" aria-live="polite" aria-busy="true">
+                <span class="content--waiting-label">{{ session.currentStage || 'Thinking' }}</span>
+                <span class="thinking-bubbles" aria-hidden="true">
+                  <span class="thinking-bubbles__dot"></span>
+                  <span class="thinking-bubbles__dot"></span>
+                  <span class="thinking-bubbles__dot"></span>
+                </span>
+              </div>
+            }
+
+            @if (session.messageMeta[$index]; as meta) {
+              <div class="trust">
+                <button type="button" class="trust__toggle" (click)="session.toggleTrust($index)">
+                  <span class="material-symbols-outlined trust__icon" aria-hidden="true">verified</span>
+                  <span class="trust__summary">
+                    @if (meta.judge) {
+                      <span [class]="session.verdictClass(meta.judge.verdict)">
+                        {{ meta.judge.verdict }}
+                      </span>
+                      <span class="trust__score">
+                        grounded {{ meta.judge.groundedness }}/10 · relevance {{ meta.judge.relevance }}/10
+                      </span>
+                    } @else {
+                      <span class="trust__score">Sources</span>
+                    }
+                    @if (meta.plan?.route) {
+                      <span class="trust__route">· via {{ meta.plan?.route }}</span>
+                    }
+                  </span>
+                  <span class="material-symbols-outlined trust__chevron" aria-hidden="true">
+                    {{ session.expandedTrustFor === $index ? 'expand_less' : 'expand_more' }}
+                  </span>
+                </button>
+                @if (session.expandedTrustFor === $index) {
+                  <div class="trust__panel">
+                    @if (meta.plan) {
+                      <div class="trust__row">
+                        <span class="trust__label">Plan</span>
+                        <span class="trust__val">
+                          {{ meta.plan.route }}
+                          @if (meta.plan.rationale) {
+                            — {{ meta.plan.rationale }}
+                          }
+                        </span>
+                      </div>
+                    }
+                    @if (meta.judge?.concerns?.length) {
+                      <div class="trust__row trust__row--concerns">
+                        <span class="trust__label">Concerns</span>
+                        <ul class="trust__concerns">
+                          @for (c of meta.judge?.concerns; track $index) {
+                            <li>{{ c }}</li>
+                          }
+                        </ul>
+                      </div>
+                    }
+                    @if (meta.retrieved?.length) {
+                      <div class="trust__row">
+                        <span class="trust__label"> Sources ({{ meta.retrieved?.length }}) </span>
+                        <ul class="trust__sources">
+                          @for (s of meta.retrieved; track $index) {
+                            <li>
+                              <button
+                                type="button"
+                                class="trust__source"
+                                [class.trust__source--locatable]="!!s.page"
+                                [disabled]="!s.page"
+                                (click)="$event.stopPropagation(); session.requestSourceJump(s)"
+                                [matTooltip]="
+                                  s.page
+                                    ? s.bbox
+                                      ? 'Jump to this passage in the document'
+                                      : 'Jump to page ' + s.page
+                                    : 'No location for this source'
+                                "
+                                matTooltipPosition="left"
+                              >
+                                <span class="trust__source-head">
+                                  @if (session.openDocuments.length > 1 && s.document_id) {
+                                    <span class="trust__docid">{{ s.document_id.slice(0, 8) }}…</span>
+                                  }
+                                  <span class="trust__section">
+                                    {{ s.section_path || '(root)' }}
+                                  </span>
+                                  <span class="trust__page">p.{{ s.page ?? '?' }}</span>
+                                  @if (s.type && s.type !== 'text') {
+                                    <span class="trust__type">{{ s.type }}</span>
+                                  }
+                                  @if (s.page) {
+                                    <span class="material-symbols-outlined trust__jump" aria-hidden="true">north_east</span>
+                                  }
+                                </span>
+                                @if (s.preview) {
+                                  <span class="trust__preview">{{ s.preview }}</span>
+                                }
+                              </button>
+                            </li>
+                          }
+                        </ul>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          } @else {
+            <div class="content">{{ m.content }}</div>
+          }
+        </div>
+      }
+      <div #messagesEnd></div>
+    </div>
+  </div>
+
+  <div class="chat-panel__composer lumen-chat__composer">
+    @if (session.processingBannerText && !session.isDocumentReady) {
+      <div class="processing-banner" role="status" aria-live="polite">
+        @if (session.hasPendingInFlight) {
+          <mat-spinner diameter="16"></mat-spinner>
+        } @else {
+          <span class="material-symbols-outlined" aria-hidden="true">error</span>
+        }
+        <span class="processing-banner__text">{{ session.processingBannerText }}</span>
+      </div>
+    }
+    <div class="chat-input-card lumen-chat__input-card">
+      @if (session.documentId && session.activeFileName) {
+        <div class="chat-input-card__context">
+          <span class="material-symbols-outlined chat-input-card__context-symbol" aria-hidden="true"
+            >description</span
+          >
+          <span class="chat-input-card__context-name">
+            @if (session.openDocuments.length > 1) {
+              {{ session.openDocuments.length }} files in scope
+            } @else {
+              {{ session.activeFileName }}
+            }
+          </span>
+        </div>
+      }
+      <div class="lumen-chat__field-wrap">
+        <textarea
+          class="chat-input-card__field"
+          rows="3"
+          [(ngModel)]="session.userInput"
+          [disabled]="!session.documentId || session.sending || !session.isDocumentReady"
+          [placeholder]="
+            session.isDocumentReady ? 'Ask about your document(s)…' : 'Processing document(s)…'
+          "
+          (keydown)="onComposerKeydown($event)"
+        ></textarea>
+        <button
+          type="button"
+          class="lumen-chat__send"
+          [disabled]="!session.documentId || session.sending || !session.isDocumentReady || !session.userInput.trim()"
+          (click)="send()"
+          aria-label="Send message"
+        >
+          <span class="material-symbols-outlined" aria-hidden="true">send</span>
+        </button>
+      </div>
+    </div>
+    <p class="lumen-chat__hint">Responses are synthesized based on provided documentation.</p>
+  </div>
+</div>

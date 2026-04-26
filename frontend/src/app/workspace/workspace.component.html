@@ -1,0 +1,140 @@
+<input
+  #fileInput
+  type="file"
+  accept="application/pdf"
+  multiple
+  hidden
+  (change)="onFileSelected($event)"
+/>
+<input
+  #addFileInput
+  type="file"
+  accept="application/pdf"
+  multiple
+  hidden
+  (change)="onAddFileSelected($event)"
+/>
+
+<header class="main__header">
+  <button
+    mat-icon-button
+    type="button"
+    class="main__sidebar-toggle"
+    (click)="toggleSidebar()"
+    aria-label="Toggle sidebar"
+  >
+    <mat-icon>chevron_left</mat-icon>
+  </button>
+  <h1 class="main__title">{{ mainTitle }}</h1>
+  @if (session.documentId && session.pdfData) {
+    <span class="main__header-spacer"></span>
+    <button mat-button type="button" color="primary" (click)="triggerAddPdf()">Add PDF</button>
+    <button mat-button type="button" color="primary" (click)="clearDocument()">Close all</button>
+  }
+</header>
+
+<div class="main__body">
+  @if (session.documentId && session.pdfData) {
+    <div #splitShell class="shell shell--split">
+      <section class="pdf-pane" aria-label="PDF preview">
+        <div class="pdf-frame-wrap">
+          <app-pdf-viewer [pdfData]="session.pdfData" [documentId]="session.documentId" />
+        </div>
+      </section>
+      <div
+        class="split-resizer"
+        [class.split-resizer--dragging]="splitResizerDragging"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize document and chat panels"
+        title="Drag to resize"
+        (mousedown)="onSplitResizeStart($event)"
+      ></div>
+      <aside class="chat-rail" [style.flex]="'0 0 ' + session.chatRailWidthPx + 'px'">
+        <app-lumen-chat-panel />
+      </aside>
+    </div>
+  } @else {
+    <div class="workspace-home">
+      <div class="workspace-home__scroll">
+        <section class="lumen-upload-section" aria-label="Upload a PDF">
+          <div class="lumen-upload-section__intro">
+            <span class="lumen-upload-section__eyebrow">New inquiry</span>
+            <h2 class="lumen-upload-section__title">Upload your manuscript</h2>
+            <p class="lumen-upload-section__lead">
+              Add one PDF to read and chat. For several files, use
+              <a routerLink="/app/batch" class="lumen-link">Batch upload</a> then open the
+              <a routerLink="/app/research" class="lumen-link">Research</a> workspace to switch documents in tabs.
+            </p>
+          </div>
+          <div
+            class="lumen-dropzone"
+            [class.lumen-dropzone--active]="dropzoneActive"
+            (click)="triggerPdfUpload()"
+            (dragover)="onDropzoneDragOver($event)"
+            (dragleave)="onDropzoneDragLeave($event)"
+            (drop)="onDropzoneDrop($event)"
+            role="button"
+            tabindex="0"
+            (keydown.enter)="triggerPdfUpload()"
+            (keydown.space)="$event.preventDefault(); triggerPdfUpload()"
+            [attr.aria-label]="'Upload a PDF. ' + (session.uploading ? 'Uploading.' : 'Choose a file or drop here.')"
+          >
+            <div class="lumen-dropzone__glow" aria-hidden="true"></div>
+            <div class="lumen-dropzone__card">
+              <div class="lumen-dropzone__icon-wrap">
+                @if (session.uploading) {
+                  <mat-spinner diameter="36"></mat-spinner>
+                } @else {
+                  <span class="material-symbols-outlined lumen-dropzone__icon" aria-hidden="true"
+                    >upload_file</span
+                  >
+                }
+              </div>
+              <h3 class="lumen-dropzone__heading">Drop your PDF here</h3>
+              <p class="lumen-dropzone__hint">.pdf only. Only the first file is used if you select more than one.</p>
+              <button
+                type="button"
+                class="lumen-dropzone__btn"
+                [disabled]="session.uploading"
+                (click)="$event.stopPropagation(); triggerPdfUpload()"
+              >
+                <span>Select PDF</span>
+                <span class="material-symbols-outlined" aria-hidden="true">add</span>
+              </button>
+            </div>
+          </div>
+        </section>
+        <section class="lumen-recent" aria-labelledby="lumen-recent-heading">
+          <div class="lumen-recent__head">
+            <h3 id="lumen-recent-heading" class="lumen-recent__title">Recent Documents</h3>
+            <a class="lumen-recent__link" routerLink="/app/library">View Library</a>
+          </div>
+          <ul class="lumen-recent__list">
+            @for (doc of recentDocuments; track doc.name) {
+              <li class="lumen-recent__item">
+                <div class="lumen-recent__main">
+                  <div class="lumen-recent__thumb">
+                    <span class="material-symbols-outlined" aria-hidden="true">description</span>
+                  </div>
+                  <div>
+                    <h4 class="lumen-recent__name">{{ doc.name }}</h4>
+                    <p class="lumen-recent__meta">{{ doc.meta }}</p>
+                  </div>
+                </div>
+                <div class="lumen-recent__actions">
+                  <button type="button" class="lumen-recent__icon-btn" aria-label="Open in new">
+                    <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
+                  </button>
+                  <button type="button" class="lumen-recent__icon-btn" aria-label="More">
+                    <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
+                  </button>
+                </div>
+              </li>
+            }
+          </ul>
+        </section>
+      </div>
+    </div>
+  }
+</div>

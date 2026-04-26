@@ -1,0 +1,161 @@
+<input
+  #fileInput
+  type="file"
+  accept="application/pdf"
+  multiple
+  hidden
+  (change)="onFileSelected($event)"
+/>
+
+<div class="batch-page workspace-home__scroll">
+  <header class="main__header batch-page__header">
+    <button
+      mat-icon-button
+      type="button"
+      class="main__sidebar-toggle"
+      (click)="toggleSidebar()"
+      aria-label="Toggle sidebar"
+    >
+      <mat-icon>chevron_left</mat-icon>
+    </button>
+    <h1 class="main__title">Batch upload</h1>
+  </header>
+
+  <div class="lumen-batch">
+    <div class="lumen-batch__hero lumen-batch-hero">
+      <div class="lumen-batch-hero__left">
+        <span class="lumen-batch-hero__eyebrow">Submission portal</span>
+        <h2 class="lumen-batch-hero__title">
+          Collate and analyze scholarly artifacts in <em>unison</em>.
+        </h2>
+        <p class="lumen-batch-hero__lead">
+          Upload your collection for batch processing. Lumen will index each PDF so you can ask across all open
+          files from the research workspace.
+        </p>
+      </div>
+      <div class="lumen-batch-hero__stat">
+        <div class="lumen-batch-hero__stat-value">{{ session.openDocuments.length }}</div>
+        <div class="lumen-batch-hero__stat-label">Files in queue</div>
+        <button
+          type="button"
+          class="lumen-batch-hero__cta"
+          [disabled]="!canStartConversation"
+          (click)="openResearchWorkspace()"
+        >
+          Start chatting
+        </button>
+      </div>
+    </div>
+
+    <div
+      class="lumen-batch__drop lumen-batch-drop"
+      [class.lumen-batch-drop--active]="batchZoneActive"
+      (click)="triggerPdfUpload()"
+      (dragover)="onBatchZoneDragOver($event)"
+      (dragleave)="onBatchZoneDragLeave($event)"
+      (drop)="onBatchZoneDrop($event)"
+      role="button"
+      tabindex="0"
+      (keydown.enter)="triggerPdfUpload()"
+      (keydown.space)="$event.preventDefault(); triggerPdfUpload()"
+      [attr.aria-label]="'Add PDFs to the batch. ' + (session.uploading ? 'Uploading.' : 'Drop or choose files.')"
+    >
+      @if (session.uploading) {
+        <mat-spinner diameter="40"></mat-spinner>
+      } @else {
+        <span class="material-symbols-outlined lumen-batch-drop__icon" aria-hidden="true">cloud_upload</span>
+      }
+      <p class="lumen-batch-drop__title">Drop PDFs or <em>browse</em></p>
+      <p class="lumen-batch-drop__hint">.pdf only — add several files; then open the research workspace to chat.</p>
+    </div>
+
+    <div class="lumen-batch__columns">
+      <section class="lumen-batch-col" aria-labelledby="batch-uploading">
+        <div class="lumen-batch-col__head">
+          <h3 id="batch-uploading" class="lumen-batch-col__title">Uploading / processing</h3>
+          <span class="lumen-batch-col__count">{{ session.docsInProgress.length }} items</span>
+        </div>
+        <ul class="lumen-batch-col__list">
+          @for (d of session.docsInProgress; track d.id) {
+            <li class="lumen-queue-card lumen-queue-card--progress">
+              <div class="lumen-queue-card__row">
+                <span class="lumen-queue-card__name">{{ d.filename }}</span>
+                <span class="material-symbols-outlined lumen-queue-card__spin" aria-hidden="true">sync</span>
+              </div>
+              <div class="lumen-queue-card__bar">
+                <div
+                  class="lumen-queue-card__bar-fill"
+                  [style.width.%]="(d.status?.progress ?? 0) * 100"
+                ></div>
+              </div>
+              <div class="lumen-queue-card__meta">
+                <span>{{ d.status?.stage ?? 'Queued' }}</span>
+                <span>{{ (d.status?.progress ?? 0) * 100 | number: '1.0-0' }}%</span>
+              </div>
+            </li>
+          }
+          @if (session.docsInProgress.length === 0) {
+            <li class="lumen-batch-col__empty">Nothing in this stage.</li>
+          }
+        </ul>
+      </section>
+
+      <section class="lumen-batch-col" aria-labelledby="batch-ready">
+        <div class="lumen-batch-col__head">
+          <h3 id="batch-ready" class="lumen-batch-col__title">Ready for analysis</h3>
+          <span class="lumen-batch-col__count">{{ session.docsReadyList.length }} items</span>
+        </div>
+        <ul class="lumen-batch-col__list">
+          @for (d of session.docsReadyList; track d.id) {
+            <li class="lumen-queue-card lumen-queue-card--ready">
+              <div class="lumen-queue-card__row">
+                <div>
+                  <span class="lumen-queue-card__name">{{ d.filename }}</span>
+                  <p class="lumen-queue-card__sub">Indexed · ready to chat</p>
+                </div>
+                <span
+                  class="material-symbols-outlined lumen-queue-card__ok"
+                  aria-hidden="true"
+                  style="font-variation-settings: 'FILL' 1"
+                  >check_circle</span
+                >
+              </div>
+            </li>
+          }
+          @if (session.docsReadyList.length === 0) {
+            <li class="lumen-batch-col__empty">No files ready yet.</li>
+          }
+        </ul>
+      </section>
+
+      <section class="lumen-batch-col" aria-labelledby="batch-issues">
+        <div class="lumen-batch-col__head">
+          <h3 id="batch-issues" class="lumen-batch-col__title">Needs attention</h3>
+          <span class="lumen-batch-col__count">{{ session.docsFailedList.length }} items</span>
+        </div>
+        <ul class="lumen-batch-col__list">
+          @for (d of session.docsFailedList; track d.id) {
+            <li class="lumen-queue-card lumen-queue-card--done">
+              <div class="lumen-queue-card__row">
+                <div>
+                  <span class="lumen-queue-card__name">{{ d.filename }}</span>
+                  <p class="lumen-queue-card__sub">
+                    {{ d.status?.error ?? 'Processing error' }}
+                  </p>
+                </div>
+                <span class="material-symbols-outlined" aria-hidden="true">error</span>
+              </div>
+            </li>
+          }
+          @if (session.docsFailedList.length === 0) {
+            <li class="lumen-batch-col__empty">No failed uploads.</li>
+          }
+        </ul>
+        <p class="lumen-batch__footnote">
+          Status updates while each file is uploaded to the server and then while the backend processes it (poll every
+          ~1.8s). Open the research workspace to work in tabs with chat.
+        </p>
+      </section>
+    </div>
+  </div>
+</div>

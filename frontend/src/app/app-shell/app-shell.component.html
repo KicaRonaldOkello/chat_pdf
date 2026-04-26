@@ -1,0 +1,98 @@
+<div class="app-layout lumen-app">
+  <aside id="app-sidebar" class="sidebar lumen-sidebar" [class.sidebar--collapsed]="sidebarCollapsed">
+    <div class="lumen-sidebar__top">
+      <button
+        type="button"
+        class="lumen-sidebar__account"
+        [matMenuTriggerFor]="accountMenu"
+        [matTooltip]="sidebarCollapsed ? 'Account' : ''"
+        matTooltipPosition="right"
+      >
+        <span class="lumen-sidebar__avatar" aria-hidden="true">{{ (session.activeFileName || 'U').charAt(0).toUpperCase() }}</span>
+        @if (!sidebarCollapsed) {
+          <span class="lumen-sidebar__account-name">Account</span>
+          <span class="material-symbols-outlined lumen-sidebar__chevron" aria-hidden="true">expand_more</span>
+        }
+      </button>
+      <mat-menu #accountMenu="matMenu">
+        <button mat-menu-item type="button" disabled>Profile</button>
+        <button mat-menu-item type="button" disabled>Settings</button>
+      </mat-menu>
+    </div>
+
+    @if (!sidebarCollapsed) {
+      <div class="lumen-sidebar__brand">
+        <h3 class="lumen-sidebar__brand-title">Research Lab</h3>
+        <p class="lumen-sidebar__brand-sub">Lumen AI Engine</p>
+      </div>
+    }
+
+    <nav class="lumen-sidebar__nav" aria-label="Main">
+      <a
+        class="lumen-sidebar__item lumen-sidebar__item--link"
+        routerLink="/app"
+        [routerLinkActiveOptions]="{ exact: true }"
+        routerLinkActive="lumen-sidebar__item--active"
+        [matTooltip]="sidebarCollapsed ? 'Home' : ''"
+        matTooltipPosition="right"
+      >
+        <span class="material-symbols-outlined" aria-hidden="true">home</span>
+        @if (!sidebarCollapsed) {
+          <span class="lumen-sidebar__item-label">Home</span>
+        }
+      </a>
+      <a
+        class="lumen-sidebar__item lumen-sidebar__item--link"
+        routerLink="/app/batch"
+        routerLinkActive="lumen-sidebar__item--active"
+        [matTooltip]="sidebarCollapsed ? 'Batch upload' : ''"
+        matTooltipPosition="right"
+      >
+        <span class="material-symbols-outlined" aria-hidden="true">upload_file</span>
+        @if (!sidebarCollapsed) {
+          <span class="lumen-sidebar__item-label">Batch upload</span>
+        }
+      </a>
+      <a
+        class="lumen-sidebar__item lumen-sidebar__item--link"
+        routerLink="/app/library"
+        routerLinkActive="lumen-sidebar__item--active"
+        [matTooltip]="sidebarCollapsed ? 'Library' : ''"
+        matTooltipPosition="right"
+      >
+        <span class="material-symbols-outlined" aria-hidden="true">menu_book</span>
+        @if (!sidebarCollapsed) {
+          <span class="lumen-sidebar__item-label">Library</span>
+        }
+      </a>
+    </nav>
+
+    <div class="lumen-sidebar__tokens">
+      @if (!sidebarCollapsed) {
+        <div class="lumen-tokens">
+          <div class="lumen-tokens__row">
+            <span class="lumen-tokens__label">Tokens Remaining</span>
+            <span class="lumen-tokens__value">{{ tokensRemainingPercent }}%</span>
+          </div>
+          <div class="lumen-tokens__track" aria-hidden="true">
+            <div class="lumen-tokens__fill" [style.width.%]="tokensRemainingPercent"></div>
+          </div>
+        </div>
+      } @else {
+        <div
+          class="lumen-tokens lumen-tokens--collapsed"
+          [matTooltip]="'Tokens: ' + tokensRemainingPercent + '%'"
+          matTooltipPosition="right"
+        >
+          <div class="lumen-tokens__track" aria-hidden="true">
+            <div class="lumen-tokens__fill" [style.width.%]="tokensRemainingPercent"></div>
+          </div>
+        </div>
+      }
+    </div>
+  </aside>
+
+  <div class="main lumen-main">
+    <router-outlet />
+  </div>
+</div>

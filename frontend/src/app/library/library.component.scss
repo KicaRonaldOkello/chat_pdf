@@ -1,0 +1,72 @@
+$lumen-on-surface: #1a1c1c;
+$lumen-secondary: #5e5e5e;
+$lumen-zinc-400: #a1a1aa;
+$lumen-bg: #f9f9f9;
+$lumen-zinc-200: #e4e4e7;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: $lumen-bg;
+  font-family: Inter, system-ui, sans-serif;
+  color: $lumen-on-surface;
+}
+
+.main__header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 56px;
+  padding: 0 0.75rem 0 0.25rem;
+  background: rgba($lumen-bg, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid $lumen-zinc-200;
+  flex-shrink: 0;
+}
+
+.main__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.main__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.placeholder-page {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.placeholder-page__title {
+  margin: 0;
+  font-family: Newsreader, Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.placeholder-page__text {
+  margin: 0 0 0.5rem;
+  max-width: 360px;
+  color: $lumen-secondary;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.lumen-placeholder__icon {
+  font-size: 3rem;
+  color: $lumen-zinc-400;
+}

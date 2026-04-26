@@ -1,0 +1,22 @@
+import { Routes } from '@angular/router';
+
+import { AppShellComponent } from './app-shell/app-shell.component';
+import { BatchUploadComponent } from './batch-upload/batch-upload.component';
+import { BatchWorkspaceComponent } from './batch-workspace/batch-workspace.component';
+import { LandingComponent } from './landing/landing.component';
+import { LibraryComponent } from './library/library.component';
+import { WorkspaceComponent } from './workspace/workspace.component';
+
+export const routes: Routes = [
+  { path: '', component: LandingComponent },
+  {
+    path: 'app',
+    component: AppShellComponent,
+    children: [
+      { path: '', pathMatch: 'full', component: WorkspaceComponent },
+      { path: 'batch', component: BatchUploadComponent },
+      { path: 'research', component: BatchWorkspaceComponent },
+      { path: 'library', component: LibraryComponent }
+    ]
+  }
+];

@@ -1,0 +1,171 @@
+<div class="pdf-viewer-root">
+  @if (loading) {
+    <div class="pdf-loading" aria-busy="true">Loading PDF…</div>
+  }
+  @if (error) {
+    <div class="pdf-error" role="alert">{{ error }}</div>
+  }
+
+  @if (pdfReady) {
+    <header class="pdf-toolbar">
+      <div class="toolbar-left">
+        <button
+          type="button"
+          class="toolbar-btn"
+          [class.active]="thumbnailsOpen"
+          (click)="toggleThumbnails()"
+          [attr.aria-pressed]="thumbnailsOpen"
+          aria-label="Page thumbnails"
+        >
+          <mat-icon>grid_view</mat-icon>
+        </button>
+        <button
+          type="button"
+          class="toolbar-btn"
+          [class.active]="searchOpen"
+          (click)="toggleSearch()"
+          [attr.aria-pressed]="searchOpen"
+          aria-label="Search in document"
+        >
+          <mat-icon>search</mat-icon>
+        </button>
+      </div>
+
+      <div class="toolbar-center">
+        <button type="button" class="toolbar-btn" (click)="goToPrevPage()" [disabled]="currentPage <= 1" aria-label="Previous page">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+        <span class="page-indicator">
+          <span class="page-current">{{ currentPage }}</span>
+          <span class="page-of">of {{ totalPages }}</span>
+        </span>
+        <button
+          type="button"
+          class="toolbar-btn"
+          (click)="goToNextPage()"
+          [disabled]="currentPage >= totalPages"
+          aria-label="Next page"
+        >
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+      </div>
+
+      <div class="toolbar-right">
+        <button type="button" class="zoom-btn" [matMenuTriggerFor]="zoomMenu" aria-label="Zoom">
+          <span class="zoom-value">{{ zoomPercent }}%</span>
+          <mat-icon class="zoom-chevron">expand_more</mat-icon>
+        </button>
+        <mat-menu #zoomMenu="matMenu" class="pdf-zoom-menu">
+          @for (z of zoomPresets; track z) {
+            <button mat-menu-item (click)="setZoom(z)">{{ z }}%</button>
+          }
+        </mat-menu>
+      </div>
+    </header>
+
+    @if (searchOpen) {
+      <div class="pdf-search">
+        <div class="pdf-search-bar">
+          <mat-icon class="search-icon">search</mat-icon>
+          <input
+            type="search"
+            class="search-input"
+            placeholder="Search this document by meaning…"
+            [value]="searchQuery"
+            [disabled]="!documentId"
+            (input)="onSearchInput($event)"
+            (keydown.enter)="runSearch()"
+          />
+          <button
+            type="button"
+            class="toolbar-btn small"
+            (click)="runSearch()"
+            [disabled]="!documentId || searchLoading || !searchQuery.trim()"
+          >
+            @if (searchLoading) { <mat-icon class="spin">progress_activity</mat-icon> }
+            @else { Find }
+          </button>
+          @if (searchRan && !searchLoading && !searchError && searchResults.length > 0) {
+            <span class="search-meta">{{ searchResults.length }} match{{ searchResults.length === 1 ? '' : 'es' }}</span>
+          }
+          @if (searchRan && !searchLoading && !searchError && searchQuery.trim() && searchResults.length === 0) {
+            <span class="search-meta none">No matches</span>
+          }
+          @if (searchError) {
+            <span class="search-meta none">{{ searchError }}</span>
+          }
+          @if (searchResults.length > 0 && searchResultsHidden) {
+            <button
+              type="button"
+              class="toolbar-btn small pdf-search__show"
+              (click)="showSearchResults()"
+              matTooltip="Show results again"
+              matTooltipPosition="below"
+            >
+              Show results
+            </button>
+          }
+        </div>
+      </div>
+    }
+  }
+
+  <div class="pdf-body" [class.thumbs-open]="thumbnailsOpen && pdfReady">
+    @if (pdfReady) {
+      <aside
+        class="pdf-thumbnails"
+        [class.pdf-thumbnails--collapsed]="!thumbnailsOpen"
+        #thumbHost
+        aria-label="Page thumbnails"
+      ></aside>
+    }
+    @if (pdfReady && searchOpen && searchResults.length > 0 && !searchResultsHidden) {
+      <aside class="pdf-search-sidebar" aria-label="Search results">
+        <div class="pdf-search-sidebar__head">
+          <span class="pdf-search-sidebar__label">
+            {{ searchResults.length }} result{{ searchResults.length === 1 ? '' : 's' }}
+          </span>
+          <button
+            type="button"
+            class="pdf-search-sidebar__close"
+            (click)="hideSearchResults()"
+            matTooltip="Hide results (stay on current page)"
+            matTooltipPosition="right"
+            aria-label="Hide search results"
+          >
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        <ul class="pdf-search-results">
+          @for (r of searchResults; track r.chunk_id; let i = $index) {
+            <li>
+              <button
+                type="button"
+                class="pdf-search-result"
+                [class.active]="i === searchActiveIndex"
+                (click)="selectSearchResult(i)"
+                [matTooltip]="r.bbox ? 'Jump to this passage' : 'Jump to page ' + r.page"
+                matTooltipPosition="right"
+              >
+                <span class="pdf-search-result__head">
+                  <span class="pdf-search-result__section">
+                    {{ r.section_path || '(root)' }}
+                  </span>
+                  <span class="pdf-search-result__page">p.{{ r.page ?? '?' }}</span>
+                  @if (r.type && r.type !== 'text') {
+                    <span class="pdf-search-result__type">{{ r.type }}</span>
+                  }
+                  <mat-icon class="pdf-search-result__jump">north_east</mat-icon>
+                </span>
+                @if (r.preview) {
+                  <span class="pdf-search-result__preview">{{ r.preview }}</span>
+                }
+              </button>
+            </li>
+          }
+        </ul>
+      </aside>
+    }
+    <div class="pdf-pages-host" #pagesHost></div>
+  </div>
+</div>

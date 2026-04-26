@@ -1,0 +1,72 @@
+[project]
+name = "chat-pdf-backend"
+version = "0.1.0"
+description = "FastAPI backend for PDF chat with Ollama"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.32.1",
+    "python-multipart==0.0.17",
+    "httpx==0.28.1",
+    "openai>=1.59.0",
+    "pypdf>=5.1.0",
+    "unstructured[pdf]>=0.15.0",
+    "camelot-py>=1.0.0",
+    "opencv-python-headless>=4.8.0",
+    "pymupdf>=1.24.0",
+    "qdrant-client>=1.10.0",
+    "tiktoken>=0.7.0",
+    "langgraph>=0.2.50",
+    "langchain-core>=0.3.20",
+    "pydantic>=2.8.0",
+    "sentence-transformers>=3.0.0",
+    "python-dotenv>=1.2.2",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "black>=26.3.1",
+    "mypy>=1.20.2",
+    "ruff>=0.15.11",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+exclude = [".venv", "data"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "C4", "RUF"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+warn_return_any = true
+warn_unused_configs = true
+warn_unused_ignores = true
+check_untyped_defs = true
+disallow_any_generics = true
+no_implicit_optional = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = ["fitz"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["sentence_transformers"]
+ignore_missing_imports = true

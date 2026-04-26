@@ -1,0 +1,83 @@
+<input
+  #addFileInput
+  type="file"
+  accept="application/pdf"
+  multiple
+  hidden
+  (change)="onAddFileSelected($event)"
+/>
+
+<header class="main__header research-header">
+  <button
+    mat-icon-button
+    type="button"
+    class="main__sidebar-toggle"
+    (click)="toggleSidebar()"
+    aria-label="Toggle sidebar"
+  >
+    <mat-icon>chevron_left</mat-icon>
+  </button>
+  <h1 class="main__title">{{ mainTitle }}</h1>
+  @if (session.documentId && session.pdfData) {
+    <span class="main__header-spacer"></span>
+    <button mat-button type="button" color="primary" (click)="triggerAddPdf()">Add PDF</button>
+    <button mat-button type="button" color="primary" (click)="clearAll()">Close all</button>
+  }
+</header>
+
+<div class="main__body">
+  @if (session.documentId && session.pdfData) {
+    <div #splitShell class="shell shell--split">
+      <section class="pdf-pane" aria-label="PDF preview">
+        <div class="pdf-doc-tabs" role="tablist" aria-label="Open documents">
+          @for (d of session.openDocuments; track d.id) {
+            <div
+              class="pdf-doc-tabs__item"
+              [class.pdf-doc-tabs__item--active]="d.id === session.activeDocumentId"
+            >
+              <button
+                type="button"
+                class="pdf-doc-tabs__tab"
+                role="tab"
+                [attr.aria-selected]="d.id === session.activeDocumentId"
+                (click)="selectTab(d.id)"
+              >
+                <span class="pdf-doc-tabs__label" [matTooltip]="d.filename" matTooltipShowDelay="400">
+                  {{ d.filename }}
+                </span>
+              </button>
+              <button
+                type="button"
+                class="pdf-doc-tabs__close"
+                aria-label="Close document"
+                (click)="removeDocument(d.id, $event)"
+              >
+                <span class="material-symbols-outlined" aria-hidden="true">close</span>
+              </button>
+            </div>
+          }
+          <button type="button" class="pdf-doc-tabs__add" aria-label="Add PDF" (click)="triggerAddPdf()">
+            <span class="material-symbols-outlined" aria-hidden="true">add</span>
+          </button>
+        </div>
+        <div class="pdf-frame-wrap">
+          <app-pdf-viewer [pdfData]="session.pdfData" [documentId]="session.documentId" />
+        </div>
+      </section>
+      <div
+        class="split-resizer"
+        [class.split-resizer--dragging]="splitResizerDragging"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize document and chat panels"
+        title="Drag to resize"
+        (mousedown)="onSplitResizeStart($event)"
+      ></div>
+      <aside class="chat-rail" [style.flex]="'0 0 ' + session.chatRailWidthPx + 'px'">
+        <app-lumen-chat-panel />
+      </aside>
+    </div>
+  } @else {
+    <p class="research-fallback">Loading…</p>
+  }
+</div>

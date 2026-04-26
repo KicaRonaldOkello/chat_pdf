@@ -1,0 +1,313 @@
+// Lumen workspace — SCSS (no Tailwind). Inter + Newsreader; Material Symbols in template.
+
+$lumen-bg: #f9f9f9;
+$lumen-on-surface: #1a1c1c;
+$lumen-secondary: #5e5e5e;
+$lumen-zinc-200: #e4e4e7;
+$lumen-zinc-400: #a1a1aa;
+$lumen-zinc-500: #71717a;
+$lumen-surface-low: #f3f3f4;
+$lumen-surface-container: #eeeeee;
+$lumen-surface-lowest: #ffffff;
+$lumen-outline-variant: #c6c6c6;
+$lumen-on-primary: #e2e2e2;
+$lumen-primary: #000000;
+$lumen-primary-container: #3b3b3b;
+$scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  font-family: Inter, system-ui, sans-serif;
+  color: $lumen-on-surface;
+  -webkit-font-smoothing: antialiased;
+  background: $lumen-bg;
+}
+*, *::before, *::after { box-sizing: border-box; }
+.lumen-link { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+a.lumen-recent__link {
+  padding: 0;
+  border: none;
+  border-bottom: 1px solid #000;
+  background: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: $lumen-on-surface;
+  cursor: pointer;
+  padding-bottom: 2px;
+  text-decoration: none;
+}
+
+.main__header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 56px;
+  padding: 0 0.75rem 0 0.25rem;
+  background: rgba($lumen-bg, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid $lumen-zinc-200;
+}
+
+.main__sidebar-toggle {
+  flex-shrink: 0;
+}
+
+.main__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: $lumen-on-surface;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.main__header-spacer {
+  flex: 1 1 auto;
+}
+
+.main__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ---- Home: upload + recent (no chat until a PDF is open) ---- */
+.workspace-home {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-home__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 2rem 2rem 2.5rem;
+}
+
+/* ---- Upload + Recent ---- */
+.lumen-upload-section {
+  max-width: 56rem;
+  margin: 0 auto 4rem;
+}
+
+.lumen-upload-section__intro {
+  margin-bottom: 1.5rem;
+}
+
+.lumen-upload-section__eyebrow {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: $lumen-zinc-400;
+  margin-bottom: 0.5rem;
+}
+
+.lumen-upload-section__title {
+  margin: 0 0 1rem;
+  font-family: Newsreader, Georgia, serif;
+  font-size: clamp(2.25rem, 4vw, 3.75rem);
+  font-weight: 500;
+  color: $lumen-on-surface;
+  line-height: 1.1;
+}
+
+.lumen-upload-section__lead {
+  margin: 0;
+  max-width: 32rem;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: $lumen-secondary;
+}
+
+.lumen-dropzone {
+  position: relative;
+  cursor: pointer;
+  border-radius: 0.75rem;
+}
+
+.lumen-dropzone:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
+
+.lumen-dropzone__glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(to bottom right, #fafafa, #e4e4e7);
+  border: 2px dashed rgba($lumen-outline-variant, 0.5);
+  opacity: 0.35;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.lumen-dropzone:hover .lumen-dropzone__glow,
+.lumen-dropzone--active .lumen-dropzone__glow {
+  opacity: 0.55;
+}
+
+.lumen-dropzone__card {
+  position: relative;
+  margin: 1px;
+  padding: 4rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: $lumen-surface-lowest;
+  border: 1px solid rgba($lumen-outline-variant, 0.25);
+  border-radius: 0.75rem;
+  box-shadow: $scholarly-shadow;
+}
+
+.lumen-dropzone__icon-wrap {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  background: $lumen-surface-low;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.lumen-dropzone__icon {
+  font-size: 2rem;
+  color: $lumen-zinc-500;
+}
+
+.lumen-dropzone__heading {
+  margin: 0 0 0.5rem;
+  font-family: Newsreader, Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: $lumen-on-surface;
+}
+
+.lumen-dropzone__hint {
+  margin: 0 0 2rem;
+  max-width: 22rem;
+  font-size: 0.875rem;
+  color: $lumen-zinc-500;
+  line-height: 1.5;
+}
+
+.lumen-dropzone__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 2rem;
+  background: $lumen-primary;
+  color: $lumen-on-primary;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.lumen-dropzone__btn:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.lumen-dropzone__btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.lumen-dropzone__btn .material-symbols-outlined {
+  font-size: 1.125rem;
+}
+
+/* ---- Split PDF + chat (single document, no tabs) ---- */
+.pdf-pane {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+.shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell--split {
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.split-resizer {
+  flex: 0 0 8px;
+  width: 8px;
+  z-index: 2;
+  cursor: col-resize;
+  align-self: stretch;
+  background: transparent;
+  position: relative;
+  touch-action: none;
+  user-select: none;
+}
+
+.split-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: rgba($lumen-outline-variant, 0.45);
+  border-radius: 1px;
+  transition: background 0.15s ease, width 0.15s ease;
+}
+
+.split-resizer:hover::after,
+.split-resizer--dragging::after {
+  background: rgba(0, 0, 0, 0.35);
+  width: 3px;
+}
+
+.split-resizer:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
+.pdf-frame-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  background: #fff;
+}
+
+.pdf-frame-wrap app-pdf-viewer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.chat-rail {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: none;
+  background: $lumen-surface-low;
+}

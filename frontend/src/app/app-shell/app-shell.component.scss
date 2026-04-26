@@ -1,0 +1,289 @@
+// Lumen workspace — SCSS (no Tailwind). Inter + Newsreader; Material Symbols in template.
+
+$lumen-bg: #f9f9f9;
+$lumen-on-surface: #1a1c1c;
+$lumen-secondary: #5e5e5e;
+$lumen-zinc-200: #e4e4e7;
+$lumen-zinc-400: #a1a1aa;
+$lumen-zinc-500: #71717a;
+$lumen-surface-low: #f3f3f4;
+$lumen-surface-container: #eeeeee;
+$lumen-surface-lowest: #ffffff;
+$lumen-outline-variant: #c6c6c6;
+$lumen-on-primary: #e2e2e2;
+$lumen-primary: #000000;
+$lumen-primary-container: #3b3b3b;
+$scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
+
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  font-family: Inter, system-ui, sans-serif;
+  color: $lumen-on-surface;
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+.app-layout {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  background: $lumen-bg;
+}
+
+/* ---- Sidebar (collapsible) ---- */
+.sidebar.lumen-sidebar {
+  flex: 0 0 256px;
+  width: 256px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: $lumen-bg;
+  border-right: 1px solid $lumen-zinc-200;
+  transition: flex-basis 0.2s ease, width 0.2s ease;
+  overflow: hidden;
+}
+
+.sidebar.lumen-sidebar.sidebar--collapsed {
+  flex-basis: 64px;
+  width: 64px;
+}
+
+.lumen-sidebar__top {
+  padding: 0.75rem 0.5rem;
+  flex-shrink: 0;
+}
+
+.lumen-sidebar__account {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.sidebar--collapsed .lumen-sidebar__account {
+  justify-content: center;
+  padding: 0.4rem;
+}
+
+.lumen-sidebar__account:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.lumen-sidebar__avatar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: $lumen-surface-low;
+  color: $lumen-on-surface;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.lumen-sidebar__account-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lumen-sidebar__chevron {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  opacity: 0.55;
+}
+
+.lumen-sidebar__brand {
+  padding: 0 1.5rem 1.5rem;
+}
+
+.lumen-sidebar__brand-title {
+  margin: 0;
+  font-family: Newsreader, Georgia, serif;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #000;
+}
+
+.lumen-sidebar__brand-sub {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: $lumen-zinc-500;
+}
+
+.lumen-sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0 0.5rem;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.lumen-sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 1rem 1.5rem;
+  border: none;
+  border-left: 4px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: $lumen-zinc-500;
+  text-align: left;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.lumen-sidebar__item .material-symbols-outlined {
+  font-size: 24px;
+  opacity: 0.9;
+}
+
+.sidebar--collapsed .lumen-sidebar__item {
+  justify-content: center;
+  padding: 1rem;
+  gap: 0;
+}
+
+.lumen-sidebar__item:hover {
+  color: #000;
+  background: $lumen-surface-low;
+}
+
+.lumen-sidebar__item--active {
+  color: #000;
+  font-weight: 600;
+  background: $lumen-surface-lowest;
+  border-left-color: #000;
+}
+
+.lumen-sidebar__item-label {
+  font-family: Newsreader, Georgia, serif;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.lumen-sidebar__tokens {
+  margin-top: auto;
+  padding: 0 1rem 1.25rem;
+  flex-shrink: 0;
+}
+
+.lumen-tokens {
+  background: $lumen-surface-low;
+  padding: 1rem;
+  border-radius: 0.5rem;
+}
+
+.lumen-tokens__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.lumen-tokens__label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: $lumen-zinc-400;
+}
+
+.lumen-tokens__value {
+  font-size: 10px;
+  font-weight: 700;
+  color: #000;
+}
+
+.lumen-tokens__track {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: #e2e2e2;
+  overflow: hidden;
+}
+
+.lumen-tokens__fill {
+  height: 100%;
+  background: #000;
+  border-radius: inherit;
+  transition: width 0.3s ease;
+}
+
+.lumen-tokens--collapsed {
+  padding: 0.5rem;
+}
+
+.lumen-tokens--collapsed .lumen-tokens__track {
+  height: 6px;
+}
+
+/* ---- Main ---- */
+.main.lumen-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: $lumen-bg;
+}
+
+/* Activated route component is a sibling of <router-outlet>; give it the full main column. */
+.main.lumen-main > router-outlet + * {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lumen-sidebar__item--link {
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 1rem 1.5rem;
+  border: none;
+  border-left: 4px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
