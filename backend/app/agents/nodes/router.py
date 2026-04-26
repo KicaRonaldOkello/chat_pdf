@@ -104,8 +104,7 @@ def render_user(state: GraphState, *, avoid_route: str | None = None) -> str:
         f"{len(doc_ids)} document(s) in scope.\n\n"
         + "\n".join(parts)
         + f"\nRecent chat:\n{chat or '(none)'}\n\n"
-        f"Current query: {state['query']}"
-        + retry_hint
+        f"Current query: {state['query']}" + retry_hint
     )
 
 

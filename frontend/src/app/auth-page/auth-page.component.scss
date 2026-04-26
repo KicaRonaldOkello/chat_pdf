@@ -1,0 +1,351 @@
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f9f9f9;
+  color: #1a1c1c;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+::selection {
+  background: #3b3b3b;
+  color: #fff;
+}
+
+.auth-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: rgba(250, 250, 250, 0.82);
+  backdrop-filter: blur(20px);
+}
+
+.auth-nav__inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1536px;
+  margin: 0 auto;
+  padding: 1.5rem 2rem;
+}
+
+.auth-nav__logo {
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 1.875rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #09090b;
+  text-decoration: none;
+}
+
+.auth-nav__signin {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #71717a;
+  text-decoration: none;
+  padding-bottom: 0.25rem;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.auth-nav__signin:hover {
+  color: #09090b;
+}
+
+.auth-nav__signin--active {
+  color: #09090b;
+  border-bottom-color: #09090b;
+}
+
+.auth-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4rem;
+  max-width: 1536px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 8rem 2rem 5rem;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .auth-main {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 4rem;
+  }
+}
+
+.auth-editorial {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .auth-editorial {
+    width: 50%;
+  }
+}
+
+.auth-editorial__inner {
+  max-width: 36rem;
+}
+
+.auth-editorial__title {
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: clamp(2.75rem, 6vw, 5.5rem);
+  font-weight: 400;
+  line-height: 0.92;
+  letter-spacing: -0.03em;
+  color: #000;
+  margin: 0 0 2rem;
+}
+
+.auth-editorial__title-accent {
+  font-style: italic;
+}
+
+.auth-editorial__lead {
+  font-size: 1.125rem;
+  line-height: 1.65;
+  color: #5e5e5e;
+  max-width: 28rem;
+  margin: 0 0 3rem;
+}
+
+.auth-editorial__figure {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  background: #f3f3f4;
+  overflow: hidden;
+}
+
+.auth-editorial__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(1);
+  opacity: 0.8;
+  mix-blend-mode: multiply;
+}
+
+.auth-editorial__caption {
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  max-width: 200px;
+  padding: 1rem;
+  background: rgba(249, 249, 249, 0.85);
+  backdrop-filter: blur(8px);
+}
+
+.auth-editorial__caption-label {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #474747;
+  margin: 0;
+}
+
+.auth-editorial__caption-quote {
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 0.75rem;
+  font-style: italic;
+  margin: 0.35rem 0 0;
+  line-height: 1.4;
+}
+
+.auth-panel-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+@media (min-width: 768px) {
+  .auth-panel-wrap {
+    width: 50%;
+    justify-content: flex-end;
+  }
+}
+
+.auth-panel {
+  width: 100%;
+  max-width: 28rem;
+  background: #fff;
+  padding: 2.5rem 2.25rem;
+  box-shadow: 0 25px 50px -12px rgba(26, 28, 28, 0.06);
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .auth-panel {
+    padding: 3.5rem 3.25rem;
+  }
+}
+
+.auth-panel__intro {
+  margin-bottom: 2rem;
+}
+
+.auth-panel__eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #5e5e5e;
+  margin: 0 0 0.5rem;
+}
+
+.auth-panel__title {
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 2.25rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: #000;
+  margin: 0;
+}
+
+.auth-clerk {
+  display: block;
+  width: 100%;
+  min-height: 12rem;
+  text-align: left;
+
+  /* Clerk’s embed defaults to a centered, max-width card; keep it flush to this column. */
+  /* ngx-clerk uses ViewEncapsulation.None on clerk-sign-in; these targets sit under .auth-clerk. */
+  clerk-sign-in {
+    display: block;
+    width: 100%;
+  }
+
+  clerk-sign-in > div {
+    width: 100%;
+  }
+
+  /* Fallback for runtime Clerk class names (Core 3 / v6) */
+  ::ng-deep {
+    [class*='cl-rootBox'] {
+      width: 100% !important;
+      max-width: 100% !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: stretch !important;
+      justify-content: flex-start !important;
+      box-sizing: border-box !important;
+    }
+
+    [class*='cl-card'] {
+      width: 100% !important;
+      max-width: 100% !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      box-sizing: border-box !important;
+    }
+
+    [class*='cl-header'] {
+      align-items: flex-start !important;
+      text-align: left !important;
+      width: 100% !important;
+    }
+
+    [class*='cl-headerTitle'],
+    [class*='cl-headerSubtitle'] {
+      text-align: left !important;
+    }
+
+    [class*='cl-main'] {
+      width: 100% !important;
+    }
+
+    [class*='cl-footer'] {
+      width: 100% !important;
+    }
+  }
+}
+
+.auth-panel__margin-note {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid #f4f4f5;
+}
+
+.auth-panel__margin-icon {
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  color: #5e5e5e;
+  font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+}
+
+.auth-panel__margin-text {
+  font-size: 11px;
+  line-height: 1.55;
+  color: #5e5e5e;
+  font-style: italic;
+  margin: 0;
+}
+
+.auth-footer {
+  border-top: 1px solid #e4e4e7;
+  background: #f4f4f5;
+  margin-top: auto;
+}
+
+.auth-footer__inner {
+  max-width: 1536px;
+  margin: 0 auto;
+  padding: 2rem 3rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .auth-footer__inner {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    text-align: left;
+  }
+}
+
+.auth-footer__brand {
+  font-family: 'Newsreader', Georgia, serif;
+  font-style: italic;
+  color: #a1a1aa;
+}
+
+.auth-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2rem;
+}
+
+.auth-footer__link {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #71717a;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.auth-footer__link:hover {
+  color: #27272a;
+}
+
+.auth-footer__copy {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #71717a;
+  margin: 0;
+}

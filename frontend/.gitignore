@@ -40,3 +40,7 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+.env
+# Generated from `.env` / env by scripts/clerk-env.mjs (do not commit; run npm install or npm run clerk:env)
+environment.autogen.ts

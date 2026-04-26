@@ -1,6 +1,7 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, map } from 'rxjs';
+import { ClerkService } from 'ngx-clerk';
+import { Observable, from, map, switchMap } from 'rxjs';
 
 import { API_BASE } from '../constants/const';
 import {
@@ -9,7 +10,9 @@ import {
   DocumentStatus,
   GuardrailReport,
   JudgeReport,
+  RecentDocumentItem,
   RetrievedSource,
+  UploadedFileItem,
   RouterPlan,
   UploadResult
 } from '../interfaces';
@@ -17,12 +20,51 @@ import {
 @Injectable({ providedIn: 'root' })
 export class ChatService {
   private readonly http = inject(HttpClient);
+  private readonly clerk = inject(ClerkService);
   private readonly base = API_BASE;
+
+  private async buildBearerHeaders(): Promise<HttpHeaders> {
+    const s = this.clerk.session();
+    if (!s) {
+      return new HttpHeaders();
+    }
+    const token = await s.getToken();
+    return token
+      ? new HttpHeaders({ Authorization: `Bearer ${token}` })
+      : new HttpHeaders();
+  }
 
   uploadPdf(file: File): Observable<UploadResult> {
     const fd = new FormData();
     fd.append('file', file, file.name);
-    return this.http.post<UploadResult>(`${this.base}/upload`, fd);
+    return from(this.buildBearerHeaders()).pipe(
+      switchMap((headers) =>
+        this.http.post<UploadResult>(`${this.base}/upload`, fd, { headers })
+      )
+    );
+  }
+
+  getRecentDocuments(limit = 3): Observable<RecentDocumentItem[]> {
+    return from(this.buildBearerHeaders()).pipe(
+      switchMap((headers) =>
+        this.http.get<RecentDocumentItem[]>(`${this.base}/documents/recent`, {
+          headers,
+          params: { limit: String(limit) }
+        })
+      )
+    );
+  }
+
+  /** Newest first from API; use `limit` to cap (default 200). */
+  getUploadedFiles(limit = 200): Observable<UploadedFileItem[]> {
+    return from(this.buildBearerHeaders()).pipe(
+      switchMap((headers) =>
+        this.http.get<UploadedFileItem[]>(`${this.base}/documents/uploaded`, {
+          headers,
+          params: { limit: String(limit) }
+        })
+      )
+    );
   }
 
   getStatus(documentId: string): Observable<DocumentStatus> {

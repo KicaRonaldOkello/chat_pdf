@@ -1,0 +1,75 @@
+<div class="auth-page">
+  <nav class="auth-nav" aria-label="Site">
+    <div class="auth-nav__inner">
+      <a class="auth-nav__logo" routerLink="/">Lumen</a>
+      <a
+        class="auth-nav__signin"
+        routerLink="/sign-in"
+        routerLinkActive="auth-nav__signin--active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        >Sign In</a
+      >
+    </div>
+  </nav>
+
+  <main class="auth-main">
+    <div class="auth-editorial">
+      <div class="auth-editorial__inner">
+        <h1 class="auth-editorial__title">
+          An intelligence <br />
+          <span class="auth-editorial__title-accent">for the curated</span> mind.
+        </h1>
+        <p class="auth-editorial__lead">
+          Lumen synthesizes complex documentation into scholarly clarity. Enter the private environment for deep
+          architectural reasoning and professional analysis.
+        </p>
+        <div class="auth-editorial__figure">
+          <img
+            class="auth-editorial__img"
+            alt="Monochromatic high-contrast photograph of an open vintage book in a dark library with a single soft beam of light illuminating the text"
+            src="https://lh3.googleusercontent.com/aida-public/AB6AXuDohZcBxLWsfS4FZZI7w59-lyfwsaRTYlaONyvn2ORU6M7EUV7OvuCt87JOqk-pW9nVTuT4g_PQKQzufmZeNL7j2IKjuAp3txAKpKzmrR_Ol0dNRe_fxmyu-7h8GFeWCtf8LC9-KskmqnwYrFz2DvjhyfzJTpzH11_YmWgU8xwV9ow7k1vOCHYbD4ILD7tXNVKlHYr8JFFIpVPrr7B-6MkJmf9HrUTd7Q6SRlJaX0Mt03-UAHD5sOsbxzQ92pTcPLZ1__SalHJORCw"
+          />
+          <div class="auth-editorial__caption">
+            <p class="auth-editorial__caption-label">Annotation 01</p>
+            <p class="auth-editorial__caption-quote">
+              "The digital preservation of architectural thought requires a silent, focused interface."
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="auth-panel-wrap">
+      <div class="auth-panel">
+        <div class="auth-panel__intro">
+          <p class="auth-panel__eyebrow">Access Portal</p>
+          <h2 class="auth-panel__title">Welcome back</h2>
+        </div>
+
+        <div class="auth-clerk">
+          <clerk-sign-in [props]="signInProps" />
+        </div>
+
+        <div class="auth-panel__margin-note">
+          <span class="material-symbols-outlined auth-panel__margin-icon" aria-hidden="true">encrypted</span>
+          <p class="auth-panel__margin-text">
+            All sessions are end-to-end encrypted within our private sovereign environment. Lumen Research does not
+            train models on individual user documentation.
+          </p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="auth-footer">
+    <div class="auth-footer__inner">
+      <span class="auth-footer__brand">Lumen</span>
+      <div class="auth-footer__links">
+        <a class="auth-footer__link" href="#">Privacy Policy</a>
+        <a class="auth-footer__link" href="#">Terms of Service</a>
+        <a class="auth-footer__link" href="#">Scholarly Guidelines</a>
+      </div>
+      <p class="auth-footer__copy">© 2026 Lumen Research. All rights reserved.</p>
+    </div>
+  </footer>
+</div>

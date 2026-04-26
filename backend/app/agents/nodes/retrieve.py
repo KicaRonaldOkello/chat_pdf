@@ -94,9 +94,7 @@ def dedupe(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for h in hits:
         key = h.get("chunk_id") or (
-            f"{h.get('document_id')}:"
-            f"{h.get('section_path')}::"
-            f"{h.get('page')}"
+            f"{h.get('document_id')}:{h.get('section_path')}::{h.get('page')}"
         )
         if key in seen:
             continue
@@ -128,14 +126,12 @@ def format_context(hits: list[dict[str, Any]]) -> str:
         grouped[k].append(h)
 
     blocks: list[str] = []
-    for (did, sp) in key_order:
+    for did, sp in key_order:
         rows = grouped[(did, sp)]
         rows.sort(
             key=lambda r: (
                 r.get("page", 0),
-                -float(
-                    r.get("rerank_score", r.get("_score", 0)) or 0
-                ),
+                -float(r.get("rerank_score", r.get("_score", 0)) or 0),
             )
         )
         head = f"## {display_filename(did)} — {sp}"

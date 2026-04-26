@@ -29,7 +29,6 @@ def spawn_background(coro) -> None:
     task.add_done_callback(_background_tasks.discard)
 
 
-
 async def process_document(doc_id: str) -> None:
     try:
         status = store.get_status(doc_id)
@@ -96,6 +95,7 @@ async def process_document(doc_id: str) -> None:
             progress=1.0,
             error=f"{type(e).__name__}: {e}\n{traceback.format_exc(limit=3)}",
         )
+
 
 async def enrich_in_background(
     doc_id: str, root: Section, filename: str, num_pages: int

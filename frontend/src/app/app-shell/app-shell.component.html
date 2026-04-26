@@ -1,25 +1,5 @@
 <div class="app-layout lumen-app">
   <aside id="app-sidebar" class="sidebar lumen-sidebar" [class.sidebar--collapsed]="sidebarCollapsed">
-    <div class="lumen-sidebar__top">
-      <button
-        type="button"
-        class="lumen-sidebar__account"
-        [matMenuTriggerFor]="accountMenu"
-        [matTooltip]="sidebarCollapsed ? 'Account' : ''"
-        matTooltipPosition="right"
-      >
-        <span class="lumen-sidebar__avatar" aria-hidden="true">{{ (session.activeFileName || 'U').charAt(0).toUpperCase() }}</span>
-        @if (!sidebarCollapsed) {
-          <span class="lumen-sidebar__account-name">Account</span>
-          <span class="material-symbols-outlined lumen-sidebar__chevron" aria-hidden="true">expand_more</span>
-        }
-      </button>
-      <mat-menu #accountMenu="matMenu">
-        <button mat-menu-item type="button" disabled>Profile</button>
-        <button mat-menu-item type="button" disabled>Settings</button>
-      </mat-menu>
-    </div>
-
     @if (!sidebarCollapsed) {
       <div class="lumen-sidebar__brand">
         <h3 class="lumen-sidebar__brand-title">Research Lab</h3>
@@ -93,6 +73,11 @@
   </aside>
 
   <div class="main lumen-main">
+    @if (clerk.isLoaded() && clerk.isSignedIn()) {
+      <div class="lumen-main__top" role="banner" aria-label="Account">
+        <clerk-user-button />
+      </div>
+    }
     <router-outlet />
   </div>
 </div>

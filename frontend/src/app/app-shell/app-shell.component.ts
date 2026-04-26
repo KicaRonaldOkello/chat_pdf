@@ -1,10 +1,9 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
+
+import { ClerkService, ClerkUserButtonComponent } from 'ngx-clerk';
 
 import { DocumentSessionService } from '../services/document-session.service';
 import { MainChromeService } from '../services/main-chrome.service';
@@ -16,10 +15,8 @@ import { MainChromeService } from '../services/main-chrome.service';
     RouterLink,
     RouterLinkActive,
     RouterOutlet,
-    MatButtonModule,
-    MatIconModule,
-    MatMenuModule,
-    MatTooltipModule
+    MatTooltipModule,
+    ClerkUserButtonComponent
   ],
   templateUrl: './app-shell.component.html',
   styleUrl: './app-shell.component.scss'
@@ -28,6 +25,7 @@ export class AppShellComponent implements OnInit, OnDestroy {
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly chrome = inject(MainChromeService);
   protected readonly session = inject(DocumentSessionService);
+  protected readonly clerk = inject(ClerkService);
   readonly tokensRemainingPercent = 84;
   sidebarCollapsed = false;
   private savedSessionNotify?: () => void;

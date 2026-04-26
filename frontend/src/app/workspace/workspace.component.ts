@@ -3,6 +3,7 @@ import {
   AfterViewInit,
   ChangeDetectorRef,
   Component,
+  effect,
   ElementRef,
   HostListener,
   inject,
@@ -10,6 +11,8 @@ import {
   OnInit,
   ViewChild
 } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
+import { ClerkService } from 'ngx-clerk';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -19,6 +22,9 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 
 import { LumenChatPanelComponent } from '../lumen-chat-panel/lumen-chat-panel.component';
+import { RecentDocumentItem } from '../interfaces';
+import { formatBytesBase2 } from '../util/format-bytes';
+import { ChatService } from '../services/chat.service';
 import { PdfViewerComponent } from '../pdf-viewer/pdf-viewer.component';
 import { DocumentSessionService } from '../services/document-session.service';
 import { LumenNotifyService } from '../services/lumen-notify.service';
@@ -46,6 +52,10 @@ export class WorkspaceComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly notify = inject(LumenNotifyService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly chrome = inject(MainChromeService);
+  private readonly chat = inject(ChatService);
+  protected readonly clerk = inject(ClerkService);
+  /** Prior `DocumentSessionService.onSessionChange` (e.g. app shell), restored on destroy. */
+  private previousSessionChange?: () => void;
   @ViewChild('fileInput') fileInput?: ElementRef<HTMLInputElement>;
   @ViewChild('addFileInput') addFileInput?: ElementRef<HTMLInputElement>;
   @ViewChild('splitShell') private splitShell?: ElementRef<HTMLElement>;
@@ -53,11 +63,7 @@ export class WorkspaceComponent implements OnInit, AfterViewInit, OnDestroy {
   splitResizerDragging = false;
   private splitDragStartX = 0;
   private splitDragStartWidth = 0;
-  readonly recentDocuments: { name: string; meta: string }[] = [
-    { name: 'Neural_Architectures_2024.pdf', meta: 'Uploaded 2h ago • 14.2 MB' },
-    { name: 'Socio_Economic_Analysis_Final.pdf', meta: 'Uploaded Yesterday • 8.1 MB' },
-    { name: 'Quantum_Entanglement_Draft.pdf', meta: 'Uploaded 3 days ago • 22.5 MB' }
-  ];
+  recentDocuments: { documentId: string; name: string; meta: string }[] = [];
   private readonly onSplitResizeMove = (ev: MouseEvent): void => {
     const shell = this.splitShell?.nativeElement;
     if (!shell) {
@@ -93,7 +99,20 @@ export class WorkspaceComponent implements OnInit, AfterViewInit, OnDestroy {
     return 'Home';
   }
 
+  constructor() {
+    effect(() => {
+      this.clerk.isLoaded();
+      this.clerk.isSignedIn();
+      void this.refreshRecentDocuments();
+    });
+  }
+
   ngOnInit(): void {
+    this.previousSessionChange = this.session.onSessionChange;
+    this.session.onSessionChange = () => {
+      this.previousSessionChange?.();
+      void this.refreshRecentDocuments();
+    };
     if (this.session.openDocuments.length > 1) {
       void this.router.navigate(['/app/research']);
       return;
@@ -109,8 +128,57 @@ export class WorkspaceComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.session.onSessionChange = this.previousSessionChange;
     document.removeEventListener('mousemove', this.onSplitResizeMove);
     document.removeEventListener('mouseup', this.onSplitResizeEnd, true);
+  }
+
+  private async refreshRecentDocuments(): Promise<void> {
+    if (!this.clerk.isLoaded() || !this.clerk.isSignedIn()) {
+      this.recentDocuments = [];
+      this.cdr.markForCheck();
+      return;
+    }
+    try {
+      const items = await firstValueFrom(this.chat.getRecentDocuments(3));
+      this.recentDocuments = items.map((r) => ({
+        documentId: r.document_id,
+        name: r.filename,
+        meta: this.recentRowMeta(r)
+      }));
+    } catch {
+      this.recentDocuments = [];
+    }
+    this.cdr.markForCheck();
+  }
+
+  private recentRowMeta(r: RecentDocumentItem): string {
+    const t = this.relativeTime(r.uploaded_at);
+    if (r.file_size_bytes != null) {
+      return `Uploaded ${t} · ${formatBytesBase2(r.file_size_bytes)}`;
+    }
+    return `Uploaded ${t}`;
+  }
+
+  private relativeTime(iso: string): string {
+    const d = new Date(iso);
+    const diff = Date.now() - d.getTime();
+    const m = Math.floor(diff / 60_000);
+    if (m < 1) {
+      return 'just now';
+    }
+    if (m < 60) {
+      return `${m}m ago`;
+    }
+    const h = Math.floor(m / 60);
+    if (h < 24) {
+      return `${h}h ago`;
+    }
+    const day = Math.floor(h / 24);
+    if (day < 7) {
+      return `${day}d ago`;
+    }
+    return d.toLocaleDateString();
   }
 
   @HostListener('window:resize')

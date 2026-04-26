@@ -9,6 +9,24 @@ export interface UploadResult {
   filename: string;
 }
 
+/** `GET /api/documents/recent` row */
+export interface RecentDocumentItem {
+  document_id: string;
+  filename: string;
+  uploaded_at: string;
+  file_size_bytes: number | null;
+}
+
+/** `GET /api/documents/uploaded` row (Library) */
+export interface UploadedFileItem {
+  document_id: string;
+  filename: string;
+  uploaded_at: string;
+  file_size_bytes: number | null;
+  processing_status: string;
+  display_status: 'analyzed' | 'processing' | 'error' | 'unknown';
+}
+
 export type DocumentProcessingStatus =
   | 'queued'
   | 'extracting'

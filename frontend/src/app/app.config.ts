@@ -3,8 +3,10 @@ import { ApplicationConfig, importProvidersFrom, provideZoneChangeDetection } fr
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideRouter } from '@angular/router';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
+import { provideClerk } from 'ngx-clerk';
 
 import { routes } from './app.routes';
+import { environment } from '../environments/environment';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -12,6 +14,9 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideHttpClient(),
     importProvidersFrom(MatSnackBarModule),
-    provideAnimationsAsync()
+    provideAnimationsAsync(),
+    provideClerk({
+      publishableKey: environment.clerkPublishableKey
+    })
   ]
 };

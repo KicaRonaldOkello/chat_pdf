@@ -10,10 +10,106 @@
   </button>
   <h1 class="main__title">Library</h1>
 </header>
-<div class="main__body">
-  <div class="placeholder-page lumen-placeholder">
-    <span class="material-symbols-outlined lumen-placeholder__icon" aria-hidden="true">menu_book</span>
-    <h2 class="placeholder-page__title">Library</h2>
-    <p class="placeholder-page__text">Saved documents will appear here.</p>
+<div class="main__body lumen-lib">
+  <div class="lumen-lib__inner">
+    @if (!clerk.isLoaded() || loading) {
+      <p class="lumen-lib__state">Loading…</p>
+    } @else if (clerk.isLoaded() && !clerk.isSignedIn()) {
+      <p class="lumen-lib__state">Sign in to see the PDFs you have uploaded.</p>
+    } @else if (loadError) {
+      <p class="lumen-lib__state lumen-lib__state--error" role="alert">{{ loadError }}</p>
+    } @else {
+      <section class="lumen-recent-files" aria-labelledby="lumen-recent-files-title">
+        <div class="lumen-recent-files__toolbar">
+          <div class="lumen-recent-files__title-rail">
+            <h2 id="lumen-recent-files-title" class="lumen-recent-files__title">Recent Files</h2>
+            <div class="lumen-recent-files__title-line" aria-hidden="true"></div>
+          </div>
+          <div class="lumen-recent-files__filter">
+            <span class="material-symbols-outlined lumen-recent-files__filter-icon" aria-hidden="true"
+              >filter_list</span
+            >
+            <label class="lumen-recent-files__filter-label" for="library-sort">Sort</label>
+            <select
+              id="library-sort"
+              class="lumen-recent-files__select"
+              [value]="sortBy"
+              (change)="onSortChange($event)"
+            >
+              <option value="date">Date Modified</option>
+              <option value="size">File Size</option>
+              <option value="name">Alphabetical</option>
+            </select>
+          </div>
+        </div>
+
+        @if (sortedFiles.length === 0) {
+          <p class="lumen-recent-files__empty">No uploads yet. Add a PDF from Home to see it here.</p>
+        } @else {
+          <div class="lumen-recent-files__table" role="table" aria-label="Your uploaded files">
+            <div class="lumen-recent-files__header" role="row">
+              <div class="lumen-recent-files__col lumen-recent-files__col--name" role="columnheader">Document Name</div>
+              <div class="lumen-recent-files__col lumen-recent-files__col--date" role="columnheader">Modified</div>
+              <div class="lumen-recent-files__col lumen-recent-files__col--size" role="columnheader">Size</div>
+              <div class="lumen-recent-files__col lumen-recent-files__col--status" role="columnheader">Status</div>
+            </div>
+            <ul class="lumen-recent-files__rows" role="list">
+              @for (f of sortedFiles; track f.document_id) {
+                <li class="lumen-recent-files__row" role="row">
+                  <div class="lumen-recent-files__col lumen-recent-files__col--name" role="cell">
+                    <span class="material-symbols-outlined lumen-recent-files__row-icon" aria-hidden="true">{{
+                      rowIcon(f.filename)
+                    }}</span>
+                    <div class="lumen-recent-files__name-block">
+                      <span class="lumen-recent-files__name">{{ f.filename }}</span>
+                      <p class="lumen-recent-files__meta-inline lumen-recent-files__muted">
+                        {{ formatDate(f.uploaded_at) }} · {{ formatSize(f.file_size_bytes) }}
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    class="lumen-recent-files__col lumen-recent-files__col--date lumen-recent-files__muted"
+                    role="cell"
+                  >
+                    {{ formatDate(f.uploaded_at) }}
+                  </div>
+                  <div
+                    class="lumen-recent-files__col lumen-recent-files__col--size lumen-recent-files__muted"
+                    role="cell"
+                  >
+                    {{ formatSize(f.file_size_bytes) }}
+                  </div>
+                  <div class="lumen-recent-files__col lumen-recent-files__col--status" role="cell">
+                    <span
+                      class="lumen-recent-files__chip"
+                      [ngClass]="{
+                        'lumen-recent-files__chip--analyzed': f.display_status === 'analyzed',
+                        'lumen-recent-files__chip--processing': f.display_status === 'processing',
+                        'lumen-recent-files__chip--error': f.display_status === 'error' || f.display_status === 'unknown',
+                      }"
+                    >
+                      @switch (f.display_status) {
+                        @case ('analyzed') {
+                          <span>Analyzed</span>
+                        }
+                        @case ('processing') {
+                          <span>Processing</span>
+                        }
+                        @case ('error') {
+                          <span>Error</span>
+                        }
+                        @default {
+                          <span>—</span>
+                        }
+                      }
+                    </span>
+                  </div>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </section>
+    }
   </div>
 </div>

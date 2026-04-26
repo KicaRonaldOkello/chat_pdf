@@ -21,6 +21,10 @@ dependencies = [
     "pydantic>=2.8.0",
     "sentence-transformers>=3.0.0",
     "python-dotenv>=1.2.2",
+    "pyjwt[crypto]>=2.8.0",
+    "psycopg[binary]>=3.1",
+    "sqlalchemy[asyncio]>=2.0",
+    "alembic>=1.18.4",
 ]
 
 [tool.uv]
@@ -69,4 +73,8 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["sentence_transformers"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["jwt", "psycopg"]
 ignore_missing_imports = true

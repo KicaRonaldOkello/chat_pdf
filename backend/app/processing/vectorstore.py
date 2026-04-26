@@ -159,9 +159,7 @@ def fetch_by_section_multi_sync(
     docs_to_paths: dict[str, list[str]], max_chunks: int = 40
 ) -> list[dict[str, Any]]:
     nonempty: dict[str, list[str]] = {
-        d: list(dict.fromkeys(p))
-        for d, p in docs_to_paths.items()
-        if p
+        d: list(dict.fromkeys(p)) for d, p in docs_to_paths.items() if p
     }
     if not nonempty:
         return []

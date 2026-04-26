@@ -19,10 +19,10 @@ from app.config import (
     METADATA_MAX_OUTPUT_TOKENS,
     METADATA_MODEL,
     METADATA_OLLAMA_BATCH_KEYWORDS_MAX,
-    METADATA_OLLAMA_BATCH_SIZE,
     METADATA_OLLAMA_BATCH_SECTION_SUMMARY_MAX,
-    METADATA_OLLAMA_SECTION_BODY_TOKENS,
+    METADATA_OLLAMA_BATCH_SIZE,
     METADATA_OLLAMA_ENRICHMENT_TIMEOUT,
+    METADATA_OLLAMA_SECTION_BODY_TOKENS,
     METADATA_OPENROUTER_ENRICHMENT_TEMPERATURE,
     METADATA_OPENROUTER_ENRICHMENT_TIMEOUT,
     METADATA_OPENROUTER_INPUT_TOKEN_BUDGET,
@@ -270,9 +270,7 @@ class SectionEnrichment:
 
 
 def render_section_for_batch(section: Section, body: str) -> str:
-    return (
-        f"--- section id: {section.id}\n" f"title: {section.title}\n" f"text:\n{body}\n"
-    )
+    return f"--- section id: {section.id}\ntitle: {section.title}\ntext:\n{body}\n"
 
 
 async def enrich_batch(
@@ -776,9 +774,7 @@ async def enrich_via_openrouter(
             return_exceptions=True,
         )
 
-    any_chunk_parsed, parsed_by_idx = partition_openrouter_chunk_results(
-        results, n
-    )
+    any_chunk_parsed, parsed_by_idx = partition_openrouter_chunk_results(results, n)
     if not any_chunk_parsed:
         log.warning("all enrichment chunks failed; falling back to Ollama path")
         return None

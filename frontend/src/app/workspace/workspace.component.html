@@ -107,29 +107,51 @@
         </section>
         <section class="lumen-recent" aria-labelledby="lumen-recent-heading">
           <div class="lumen-recent__head">
-            <h3 id="lumen-recent-heading" class="lumen-recent__title">Recent Documents</h3>
+            <h2 id="lumen-recent-heading" class="lumen-recent__title">Recent Documents</h2>
             <a class="lumen-recent__link" routerLink="/app/library">View Library</a>
           </div>
-          <ul class="lumen-recent__list">
-            @for (doc of recentDocuments; track doc.name) {
-              <li class="lumen-recent__item">
-                <div class="lumen-recent__main">
-                  <div class="lumen-recent__thumb">
-                    <span class="material-symbols-outlined" aria-hidden="true">description</span>
+          <ul class="lumen-recent__list" role="list">
+            @for (doc of recentDocuments; track doc.documentId) {
+              <li class="lumen-recent__row" role="listitem">
+                <div class="lumen-recent__row-main">
+                  <div class="lumen-recent__thumb" aria-hidden="true">
+                    <span class="material-symbols-outlined">description</span>
                   </div>
-                  <div>
-                    <h4 class="lumen-recent__name">{{ doc.name }}</h4>
+                  <div class="lumen-recent__text">
+                    <h3 class="lumen-recent__name">{{ doc.name }}</h3>
                     <p class="lumen-recent__meta">{{ doc.meta }}</p>
                   </div>
                 </div>
-                <div class="lumen-recent__actions">
-                  <button type="button" class="lumen-recent__icon-btn" aria-label="Open in new">
+                <div class="lumen-recent__actions" aria-label="Row actions">
+                  <button
+                    type="button"
+                    class="lumen-recent__action"
+                    aria-label="Open in new"
+                    title="Open document"
+                    (click)="$event.stopPropagation()"
+                  >
                     <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
                   </button>
-                  <button type="button" class="lumen-recent__icon-btn" aria-label="More">
+                  <button
+                    type="button"
+                    class="lumen-recent__action"
+                    aria-label="More options"
+                    (click)="$event.stopPropagation()"
+                  >
                     <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
                   </button>
                 </div>
+              </li>
+            } @empty {
+              <li class="lumen-recent__empty" role="status">
+                @if (clerk.isLoaded() && !clerk.isSignedIn()) {
+                  <span>Sign in to see your last uploads here.</span>
+                } @else {
+                  <span>
+                    No recent documents yet. Upload a PDF above, or open
+                    <a routerLink="/app/library" class="lumen-link">View Library</a> for the full list.
+                  </span>
+                }
               </li>
             }
           </ul>

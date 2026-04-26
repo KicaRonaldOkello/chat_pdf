@@ -82,9 +82,7 @@ METADATA_DOC_META_OPENING_CHARS = int(
     os.getenv("METADATA_DOC_META_OPENING_CHARS", "1500")
 )
 
-SLOW_UPSTREAM_REQUEST_TIMEOUT = float(
-    os.getenv("SLOW_UPSTREAM_REQUEST_TIMEOUT", "120")
-)
+SLOW_UPSTREAM_REQUEST_TIMEOUT = float(os.getenv("SLOW_UPSTREAM_REQUEST_TIMEOUT", "120"))
 QDRANT_CLIENT_TIMEOUT = int(os.getenv("QDRANT_CLIENT_TIMEOUT", "60"))
 ROUTER_REQUEST_TIMEOUT = float(os.getenv("ROUTER_REQUEST_TIMEOUT", "60"))
 JUDGE_REQUEST_TIMEOUT = float(os.getenv("JUDGE_REQUEST_TIMEOUT", "45"))
@@ -102,9 +100,7 @@ RERANK_ENABLED = os.getenv("RERANK_ENABLED", "true").lower() in (
     "true",
     "yes",
 )
-RERANK_MODEL = os.getenv(
-    "RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
-)
+RERANK_MODEL = os.getenv("RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
 RERANK_RECALL_LIMIT = int(os.getenv("RERANK_RECALL_LIMIT", "48"))
 RERANK_BATCH_SIZE = int(os.getenv("RERANK_BATCH_SIZE", "32"))
 RERANK_ONLY_MULTIPLE = os.getenv("RERANK_ONLY_MULTIPLE", "false").lower() in (
@@ -120,3 +116,13 @@ JUDGE_MODEL = os.getenv("JUDGE_MODEL", "google/gemini-2.5-flash-lite")
 
 JUDGE_PASS_THRESHOLD = int(os.getenv("JUDGE_PASS_THRESHOLD", "7"))
 AGENT_MAX_RETRIES = int(os.getenv("AGENT_MAX_RETRIES", "1"))
+
+# Clerk session JWT verification (POST /api/users/sync, future protected routes)
+CLERK_JWKS_URL = os.getenv("CLERK_JWKS_URL", "").rstrip("/")
+# Issuer claim, e.g. https://<your-instance>.clerk.accounts.dev (see Clerk dashboard → API keys)
+CLERK_ISSUER = os.getenv("CLERK_ISSUER", "").rstrip("/")
+# Optional. If set, the JWT `aud` claim is checked (Clerk "Authorized parties" / custom JWT template).
+CLERK_JWT_AUDIENCE: str | None = os.getenv("CLERK_JWT_AUDIENCE", "").strip() or None
+
+# PostgreSQL (e.g. postgresql://lumen:lumen@127.0.0.1:5432/lumen) — `docker compose` in backend/
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()

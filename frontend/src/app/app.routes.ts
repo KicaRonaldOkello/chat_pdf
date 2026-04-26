@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { AppShellComponent } from './app-shell/app-shell.component';
+import { AuthPageComponent } from './auth-page/auth-page.component';
 import { BatchUploadComponent } from './batch-upload/batch-upload.component';
 import { BatchWorkspaceComponent } from './batch-workspace/batch-workspace.component';
 import { LandingComponent } from './landing/landing.component';
@@ -9,6 +10,7 @@ import { WorkspaceComponent } from './workspace/workspace.component';
 
 export const routes: Routes = [
   { path: '', component: LandingComponent },
+  { path: 'sign-in', component: AuthPageComponent, title: 'Lumen | Authentication' },
   {
     path: 'app',
     component: AppShellComponent,

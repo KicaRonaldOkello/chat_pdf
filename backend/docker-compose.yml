@@ -11,5 +11,24 @@ services:
     environment:
       QDRANT__LOG_LEVEL: INFO
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: chat_pdf_postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: lumen
+      POSTGRES_PASSWORD: lumen
+      POSTGRES_DB: lumen
+    volumes:
+      - lumen_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lumen -d lumen"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+
 volumes:
   qdrant_storage:
+  lumen_pg_data:

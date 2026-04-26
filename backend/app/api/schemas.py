@@ -35,6 +35,21 @@ class UploadResponse(BaseModel):
     filename: str
 
 
+class UploadedFileItem(BaseModel):
+    document_id: str
+    filename: str
+    uploaded_at: str
+    file_size_bytes: int | None
+    processing_status: str = Field(
+        ...,
+        description="Pipeline status from disk: queued, extracting, …, ready, error, or unknown.",
+    )
+    display_status: str = Field(
+        ...,
+        description="UI chip: analyzed, processing, error, unknown.",
+    )
+
+
 class StatusResponse(BaseModel):
     document_id: str
     status: str

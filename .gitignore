@@ -1,0 +1,20 @@
+# Python bytecode (any subfolder, e.g. backend/)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tooling caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+
+# OS
+.DS_Store
+Thumbs.db
