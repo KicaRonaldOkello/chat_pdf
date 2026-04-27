@@ -1,5 +1,16 @@
-data "aws_ssm_parameter" "al2023" {
-  name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
+data "aws_ami" "al2023" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-x86_64"]
+  }
+
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
 }
 
 resource "aws_iam_role" "data_ec2" {
@@ -27,7 +38,7 @@ resource "aws_iam_role_policy_attachment" "data_ssm" {
 }
 
 resource "aws_instance" "data" {
-  ami                    = data.aws_ssm_parameter.al2023.value
+  ami                    = data.aws_ami.al2023.id
   instance_type          = var.data_instance_type
   subnet_id              = aws_subnet.private[0].id
   vpc_security_group_ids = [aws_security_group.data.id]

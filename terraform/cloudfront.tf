@@ -8,7 +8,7 @@ data "aws_cloudfront_cache_policy" "caching_optimized" {
 
 # Forward Authorization, cookies, query string to ALB
 data "aws_cloudfront_origin_request_policy" "all_viewer" {
-  name = "AllViewer"
+  name = "Managed-AllViewer"
 }
 
 # --- CloudFront: one distribution; S3 + optional API origin
