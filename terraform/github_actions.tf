@@ -1,20 +1,3 @@
-data "tls_certificate" "github" {
-  count = local.use_github_actions_oidc ? 1 : 0
-  url  = "https://token.actions.githubusercontent.com:443"
-}
-
-# Optional: GitHub Actions deploy role (OIDC). Fails if the same OIDC provider
-# already exists; import: terraform import 'aws_iam_openid_connect_provider.github[0]' arn:...
-resource "aws_iam_openid_connect_provider" "github" {
-  count  = local.use_github_actions_oidc ? 1 : 0
-  url    = "https://token.actions.githubusercontent.com"
-  thumbprint_list = [
-    lower(replace(data.tls_certificate.github[0].certificates[0].sha1_fingerprint, ":", ""))
-  ]
-  client_id_list = ["sts.amazonaws.com"]
-  tags = { Name = "${local.name}-github-oidc" }
-}
-
 data "aws_iam_policy_document" "gha_trust" {
   count = local.use_github_actions_oidc ? 1 : 0
   statement {
@@ -22,7 +5,7 @@ data "aws_iam_policy_document" "gha_trust" {
     actions = ["sts:AssumeRoleWithWebIdentity"]
     principals {
       type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.github[0].arn]
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"]
     }
     condition {
       test     = "StringEquals"
