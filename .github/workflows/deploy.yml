@@ -139,6 +139,12 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           role-session-name: gha-terraform-2
           aws-region: ${{ env.AWS_REGION }}
+      - name: Ensure ECS service-linked role exists
+        run: |
+          set -euo pipefail
+          if ! aws iam get-role --role-name AWSServiceRoleForECS >/dev/null 2>&1; then
+            aws iam create-service-linked-role --aws-service-name ecs.amazonaws.com
+          fi
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.7.0
