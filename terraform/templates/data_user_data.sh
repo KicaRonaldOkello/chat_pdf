@@ -15,6 +15,12 @@ docker run -d --name qdrant --restart unless-stopped \
 
 # Ollama
 curl -fsSL https://ollama.com/install.sh | sh
+mkdir -p /etc/systemd/system/ollama.service.d
+cat > /etc/systemd/system/ollama.service.d/override.conf <<'EOF'
+[Service]
+Environment="OLLAMA_HOST=0.0.0.0:11434"
+EOF
+systemctl daemon-reload
 systemctl enable ollama
 systemctl start ollama
 sleep 5

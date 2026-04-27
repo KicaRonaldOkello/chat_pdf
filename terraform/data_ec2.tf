@@ -43,6 +43,7 @@ resource "aws_instance" "data" {
   subnet_id              = aws_subnet.private[0].id
   vpc_security_group_ids = [aws_security_group.data.id]
   iam_instance_profile   = aws_iam_instance_profile.data_ec2.name
+  user_data_replace_on_change = true
 
   user_data = base64encode(templatefile("${path.module}/templates/data_user_data.sh", {
     ollama_models = var.ollama_models

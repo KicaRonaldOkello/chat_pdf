@@ -27,11 +27,18 @@ async def embed_batch(
 ) -> list[list[float]]:
     if not inputs:
         return []
-    r = await client.post(
-        f"{OLLAMA_BASE_URL}/api/embed",
-        json={"model": EMBEDDING_MODEL, "input": inputs},
-        timeout=SLOW_UPSTREAM_REQUEST_TIMEOUT,
-    )
+    try:
+        r = await client.post(
+            f"{OLLAMA_BASE_URL}/api/embed",
+            json={"model": EMBEDDING_MODEL, "input": inputs},
+            timeout=SLOW_UPSTREAM_REQUEST_TIMEOUT,
+        )
+    except httpx.ConnectError as e:
+        raise RuntimeError(
+            "Embedding service unreachable at "
+            f"{OLLAMA_BASE_URL}/api/embed. Ensure OLLAMA_BASE_URL is routable "
+            "from the API container and Ollama listens on 0.0.0.0:11434."
+        ) from e
     r.raise_for_status()
     data = r.json()
     embeds = data.get("embeddings") or []

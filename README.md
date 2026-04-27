@@ -6,24 +6,59 @@ OpenRouter vision captions), chunked by section, embedded with Ollama, and
 stored in Qdrant. Chat retrieves the top-k chunks per query and streams the
 answer through a local Ollama model.
 
-## Pipeline
+## How the project works
 
+This project has two major flows:
+
+- **Ingestion flow**: a reviewer or user uploads a PDF; backend parses and enriches
+  the document in the background; document artifacts are stored in S3/local data
+  and vector embeddings are written to Qdrant.
+- **Chat flow**: user asks a question; backend embeds the query, retrieves relevant
+  chunks from Qdrant, then streams an answer from the chat model.
+
+### End-to-end architecture (reviewer view)
+
+```mermaid
+flowchart LR
+    U[User in Angular app] -->|Upload PDF| API[FastAPI backend]
+    U -->|Ask question| API
+
+    API -->|Store source.pdf + status| DOCS[(S3 or local documents store)]
+    API -->|Background processing| PIPE[Processing pipeline]
+
+    PIPE --> P1[Structure parsing\nunstructured hi_res]
+    PIPE --> P2[Table extraction\ncamelot]
+    PIPE --> P3[Image extraction\nPyMuPDF/fitz]
+    P3 -->|Caption figures| OR[OpenRouter vision model]
+    P2 -->|Describe tables| OLLAMA[Ollama models]
+
+    PIPE --> CHUNK[Chunk builder\nsection/table/image chunks]
+    CHUNK -->|Embed text| OLLAMA
+    OLLAMA -->|Vectors| Q[(Qdrant collection: doc_chunks)]
+    PIPE -->|Write tree.json + metadata| DOCS
+
+    API -->|Embed query| OLLAMA
+    API -->|Top-k retrieval| Q
+    API -->|Stream answer tokens| U
 ```
-upload -> BackgroundTask
-          |
-          v
-  unstructured hi_res  ->  section tree
-  camelot lattice/stream  ->  tables + semantic descriptions (Ollama)
-  fitz image_info  ->  figures + captions (OpenRouter vision)
-          |
-          v
-  tree.json + chunking (section text + atomic table/image chunks)
-          |
-          v
-  Ollama nomic-embed-text -> Qdrant (collection: doc_chunks)
-          |
-          v
-  /api/chat/stream -> embed query -> Qdrant top-k -> Ollama chat
+
+### Document parsing and storage flow
+
+```mermaid
+flowchart TD
+    A[POST /api/upload] --> B[Create document_id]
+    B --> C[Persist source.pdf]
+    C --> D[Set status: queued -> extracting]
+    D --> E[Parse structure into section tree]
+    E --> F[Extract/annotate tables]
+    E --> G[Extract/caption images]
+    F --> H[Build chunks from tree]
+    G --> H
+    H --> I[Embed chunks with nomic-embed-text]
+    I --> J[Upsert vectors to Qdrant]
+    E --> K[Serialize tree.json]
+    J --> L[Set status: ready]
+    K --> L
 ```
 
 ## System dependencies
@@ -118,6 +153,13 @@ status.json      {status, stage, progress, error?, filename, num_pages?}
 tree.json        unified document tree (sections, tables, images)
 images/          figure PNGs extracted by fitz
 ```
+
+And in vector storage (`QDRANT_COLLECTION`, default `doc_chunks`), each chunk is
+stored as:
+
+- embedding vector (`EMBEDDING_DIM`, default `768`)
+- payload metadata (document id, chunk id, section/table/image context, text)
+- point id namespace-scoped per document for delete/update operations
 
 ## API
 
