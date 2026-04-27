@@ -185,10 +185,11 @@ jobs:
         working-directory: frontend
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NODE_OPTIONS: --max-old-space-size=4096
         run: |
           if [ -z "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" ]; then echo "Set var NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"; exit 1; fi
-          npm install
-          npm run build
+          npm ci
+          npm run build -- --configuration production
       - name: Sync to frontend S3
         working-directory: ${{ github.workspace }}
         run: |
