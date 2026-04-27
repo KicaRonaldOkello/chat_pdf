@@ -151,6 +151,11 @@ jobs:
             -backend-config="key=$TF_STATE_KEY" \
             -backend-config="region=$AWS_REGION" \
             -backend-config="encrypt=true"
+      - name: Cleanup stale ECS task definition state
+        working-directory: terraform
+        run: |
+          # Short-lived environment safety: remove stale revision pointer if AWS no longer has it.
+          terraform state rm 'aws_ecs_task_definition.app[0]' || true
       - name: Apply (ALB+ECS+CloudFront /api)
         working-directory: terraform
         env:
