@@ -31,6 +31,7 @@ from app.auth.claims import email_from_claims
 from app.auth.clerk_jwt import get_optional_clerk_session, require_clerk_session
 from app.config import (
     ANSWERER_MODEL,
+    CORS_ALLOW_ORIGINS,
     DATABASE_URL,
     EMBEDDING_MODEL,
     GUARDRAIL_MODEL,
@@ -79,7 +80,7 @@ app = FastAPI(title="Chat PDF API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200", "http://127.0.0.1:4200"],
+    allow_origins=CORS_ALLOW_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

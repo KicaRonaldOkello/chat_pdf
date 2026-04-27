@@ -1,0 +1,272 @@
+name: Deploy chat-pdf to AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        type: choice
+        description: deploy (full pipeline) or destroy
+        options: [deploy, destroy]
+        default: deploy
+
+# Configure: .github/DEPLOYMENT-SECRETS.md
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  TERRAFORM_STATE_BUCKET: ${{ vars.TERRAFORM_STATE_BUCKET }}
+  TF_STATE_KEY: ${{ vars.TF_STATE_KEY || 'chat-pdf/terraform.tfstate' }}
+  TF_VAR_aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+  TF_VAR_project: chat-pdf
+  TF_VAR_existing_documents_s3_bucket: ${{ vars.EXISTING_DOCS_S3_BUCKET }}
+  TF_VAR_github_owner: ${{ vars.GITHUB_ORG || github.repository_owner }}
+  TF_VAR_github_repo: ${{ vars.GITHUB_REPO || github.event.repository.name }}
+  TF_VAR_clerk_jwks_url: ${{ vars.CLERK_JWKS_URL || '' }}
+  TF_VAR_clerk_issuer: ${{ vars.CLERK_ISSUER || '' }}
+  TF_VAR_clerk_jwt_audience: ${{ vars.CLERK_JWT_AUDIENCE || '' }}
+  TF_VAR_cors_extra_origins: ${{ vars.CORS_EXTRA_ORIGINS || '' }}
+
+concurrency:
+  group: deploy-chat-pdf
+  cancel-in-progress: false
+
+jobs:
+  unit-tests:
+    if: github.event.inputs.action == 'deploy'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Backend unit tests
+        working-directory: backend
+        run: |
+          uv sync --dev
+          uv run pytest
+
+  bootstrap-state:
+    if: github.event.inputs.action == 'deploy'
+    needs: [unit-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: gha-terraform
+          aws-region: ${{ env.AWS_REGION }}
+      - name: S3 state bucket (if missing)
+        run: |
+          B="${TERRAFORM_STATE_BUCKET:?set TERRAFORM_STATE_BUCKET in repo variables}"
+          R="${{ env.AWS_REGION }}"
+          aws s3api head-bucket --bucket "$B" 2>/dev/null || aws s3 mb "s3://$B" --region "$R"
+
+  terraform-phase1:
+    if: github.event.inputs.action == 'deploy'
+    needs: [bootstrap-state]
+    runs-on: ubuntu-latest
+    outputs:
+      ecr: ${{ steps.o.outputs.ecr_url }}
+      fe_bucket: ${{ steps.o.outputs.fe_bucket }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: gha-terraform-1
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+          terraform_wrapper: false
+      - name: Init
+        working-directory: terraform
+        run: |
+          terraform init -reconfigure -input=false \
+            -backend-config="bucket=$TERRAFORM_STATE_BUCKET" \
+            -backend-config="key=$TF_STATE_KEY" \
+            -backend-config="region=$AWS_REGION" \
+            -backend-config="encrypt=true"
+      - name: Apply (ECR, VPC, RDS, Ollama EC2, frontend S3+CloudFront; no ALB/ECS)
+        working-directory: terraform
+        run: |
+          if [ -z "$TF_VAR_existing_documents_s3_bucket" ]; then echo "Set EXISTING_DOCS_S3_BUCKET in repo variables"; exit 1; fi
+          terraform apply -auto-approve -var="create_backend=false"
+      - name: Outputs
+        id: o
+        working-directory: terraform
+        run: |
+          echo "ecr_url=$(terraform output -raw ecr_repository_url)" >> $GITHUB_OUTPUT
+          echo "fe_bucket=$(terraform output -raw s3_frontend_bucket)" >> $GITHUB_OUTPUT
+
+  docker-build-push:
+    if: github.event.inputs.action == 'deploy'
+    needs: [terraform-phase1]
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.i.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: gha-ecr
+          aws-region: ${{ env.AWS_REGION }}
+      - name: ECR login and build
+        id: i
+        run: |
+          ECR_URL="${{ needs.terraform-phase1.outputs.ecr }}"
+          REG="${ECR_URL%%/*}"
+          aws ecr get-login-password --region "$AWS_REGION" | \
+            docker login --username AWS --password-stdin "$REG"
+          docker build --platform linux/amd64 -f backend/Dockerfile -t "$ECR_URL:$GITHUB_SHA" -t "$ECR_URL:latest" ./backend
+          docker push "$ECR_URL:$GITHUB_SHA"
+          docker push "$ECR_URL:latest"
+          echo "image=$ECR_URL:$GITHUB_SHA" >> $GITHUB_OUTPUT
+
+  terraform-phase2-frontend:
+    if: github.event.inputs.action == 'deploy'
+    needs: [terraform-phase1, docker-build-push]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: gha-terraform-2
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+          terraform_wrapper: false
+      - name: Init
+        working-directory: terraform
+        run: |
+          terraform init -reconfigure -input=false \
+            -backend-config="bucket=$TERRAFORM_STATE_BUCKET" \
+            -backend-config="key=$TF_STATE_KEY" \
+            -backend-config="region=$AWS_REGION" \
+            -backend-config="encrypt=true"
+      - name: Apply (ALB+ECS+CloudFront /api)
+        working-directory: terraform
+        env:
+          OR_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          if [ -z "$TF_VAR_clerk_jwks_url" ] || [ -z "$TF_VAR_clerk_issuer" ]; then
+            echo "Set CLERK_JWKS_URL and CLERK_ISSUER in repository Variables"
+            exit 1
+          fi
+          if [ -n "$OR_KEY" ]; then
+            terraform apply -auto-approve \
+              -var="create_backend=true" \
+              -var="app_image=${{ needs.docker-build-push.outputs.image }}" \
+              -var="openrouter_api_key=$OR_KEY"
+          else
+            terraform apply -auto-approve \
+              -var="create_backend=true" \
+              -var="app_image=${{ needs.docker-build-push.outputs.image }}"
+          fi
+      - name: Angular build
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+        run: |
+          if [ -z "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" ]; then echo "Set var NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"; exit 1; fi
+          npm install
+          npm run build
+      - name: Sync to frontend S3
+        working-directory: ${{ github.workspace }}
+        run: |
+          B="${{ needs.terraform-phase1.outputs.fe_bucket }}"
+          CDIR="frontend/dist/frontend/browser"
+          for d in frontend/dist/frontend/browser frontend/dist/frontend; do
+            if [ -d "$d" ]; then CDIR="$d"; break; fi
+          done
+          if [ ! -d "$CDIR" ]; then echo "Angular dist not found"; find frontend -maxdepth 4 -type d; exit 1; fi
+          aws s3 sync "$CDIR" "s3://$B" --delete
+      - name: Invalidate CloudFront
+        working-directory: ${{ github.workspace }}/terraform
+        run: |
+          CID=$(terraform output -raw cloudfront_id)
+          aws cloudfront create-invalidation --distribution-id "$CID" --paths "/*" --region us-east-1
+      - name: Summary
+        working-directory: terraform
+        run: echo "https://$(terraform output -raw cloudfront_domain)/" >> $GITHUB_STEP_SUMMARY
+
+  migrate:
+    if: github.event.inputs.action == 'deploy'
+    needs: [terraform-phase2-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: gha-migrate
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+          terraform_wrapper: false
+      - name: Init
+        working-directory: terraform
+        run: |
+          terraform init -reconfigure -input=false \
+            -backend-config="bucket=$TERRAFORM_STATE_BUCKET" \
+            -backend-config="key=$TF_STATE_KEY" \
+            -backend-config="region=$AWS_REGION" \
+            -backend-config="encrypt=true"
+      - name: Fargate — Alembic
+        working-directory: terraform
+        run: |
+          set -e
+          CLUSTER=$(terraform output -raw app_cluster_name)
+          TASK=$(terraform output -raw app_task_definition_arn)
+          SIDS=$(terraform output -raw private_subnet_ids)
+          SUB1=${SIDS%%,*}; SUB2=${SIDS#*,}
+          SG=$(terraform output -raw ecs_security_group_id)
+          OUT=$(aws ecs run-task --region "$AWS_REGION" --cluster "$CLUSTER" --task-definition "$TASK" \
+            --launch-type FARGATE --platform-version LATEST \
+            --network-configuration "awsvpcConfiguration={subnets=[$SUB1,$SUB2],securityGroups=[$SG],assignPublicIp=DISABLED}" \
+            --overrides '{"containerOverrides":[{"name":"api","command":["/bin/sh","-c","cd /app && .venv/bin/alembic -c alembic.ini upgrade head"]}]}' \
+            --no-cli-pager)
+          TARN=$(echo "$OUT" | python3 -c "import json,sys; d=json.load(sys.stdin); t=d.get('tasks',[]); print(t[0]['taskArn'] if t else '')")
+          if [ -z "$TARN" ]; then echo "$OUT"; exit 1; fi
+          aws ecs wait tasks-stopped --region "$AWS_REGION" --cluster "$CLUSTER" --tasks "$TARN"
+          aws ecs describe-tasks --region "$AWS_REGION" --cluster "$CLUSTER" --tasks "$TARN" --query "tasks[0].containers[0].exitCode" --output text
+
+  destroy:
+    if: github.event.inputs.action == 'destroy'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: gha-terraform-destroy
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+          terraform_wrapper: false
+      - name: Init
+        working-directory: terraform
+        run: |
+          if [ -z "$TERRAFORM_STATE_BUCKET" ]; then echo "TERRAFORM_STATE_BUCKET (variable) is required."; exit 1; fi
+          terraform init -reconfigure -input=false \
+            -backend-config="bucket=$TERRAFORM_STATE_BUCKET" \
+            -backend-config="key=$TF_STATE_KEY" \
+            -backend-config="region=$AWS_REGION" \
+            -backend-config="encrypt=true"
+      - name: Terraform destroy
+        working-directory: terraform
+        run: |
+          if [ -z "$TF_VAR_existing_documents_s3_bucket" ]; then
+            echo "Set EXISTING_DOCS_S3_BUCKET (variable) to match the last apply (same as deploy)."
+            exit 1
+          fi
+          terraform destroy -auto-approve

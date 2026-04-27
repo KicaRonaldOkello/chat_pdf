@@ -1,0 +1,10 @@
+# Copy to backend.hcl (gitignored) and run *exactly*:
+#   terraform init -reconfigure -backend-config=backend.hcl
+# Do not run plain `terraform init` — it will prompt for bucket/key only and fail
+# with "Missing region value" because region is not read from the prompts.
+#
+bucket  = "your-terraform-state-bucket"
+key     = "chat-pdf/terraform.tfstate"
+region  = "us-east-1"
+encrypt = true
+# Optional: add dynamodb_table = "name" for state locking (safe with CI + multiple people)

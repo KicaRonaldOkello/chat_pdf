@@ -18,3 +18,10 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/backend.hcl
+terraform/.envrc

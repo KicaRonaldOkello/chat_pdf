@@ -124,13 +124,23 @@ CLERK_ISSUER = os.getenv("CLERK_ISSUER", "").rstrip("/")
 # Optional. If set, the JWT `aud` claim is checked (Clerk "Authorized parties" / custom JWT template).
 CLERK_JWT_AUDIENCE: str | None = os.getenv("CLERK_JWT_AUDIENCE", "").strip() or None
 
+# CORS: comma-separated origins, e.g. "https://dxxxxx.cloudfront.net,https://app.example.com"
+# If unset, defaults to local Angular dev servers only.
+def _cors_origins() -> list[str]:
+    raw = (os.getenv("CORS_ALLOW_ORIGINS") or "").strip()
+    if not raw:
+        return ["http://localhost:4200", "http://127.0.0.1:4200"]
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
+
+CORS_ALLOW_ORIGINS: list[str] = _cors_origins()
+
 # PostgreSQL (e.g. postgresql://lumen:lumen@127.0.0.1:5432/lumen) — `docker compose` in backend/
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 
-# S3: PDF storage (`documents/{doc_id}/source.pdf`). Uses default boto3 credentials chain (e.g. AWS_PROFILE).
 S3_BUCKET = os.getenv("S3_BUCKET", "").strip()
 S3_KEY_PREFIX = os.getenv("S3_KEY_PREFIX", "documents").strip().strip("/") or "documents"
-# Optional; boto3 also reads AWS_DEFAULT_REGION
+
 AWS_REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "")).strip() or "us-east-1"
-# Hard cap for POST /api/upload (5 MiB by default)
+
 MAX_PDF_UPLOAD_BYTES = int(os.getenv("MAX_PDF_UPLOAD_BYTES", str(5 * 1024 * 1024)))
