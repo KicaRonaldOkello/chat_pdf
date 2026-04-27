@@ -85,7 +85,6 @@ resource "aws_ecs_task_definition" "app" {
   requires_compatibilities = ["FARGATE"]
   execution_role_arn  = aws_iam_role.ecs_exec.arn
   task_role_arn    = aws_iam_role.app_task.arn
-  track_latest = true
 
   lifecycle {
     precondition {
