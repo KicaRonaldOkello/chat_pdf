@@ -10,7 +10,7 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-from app import s3_storage
+from app.storage import get_storage
 from app.config import (
     OPENROUTER_API_KEY,
     OPENROUTER_BASE_URL,
@@ -234,10 +234,10 @@ async def enrich_images(
         return
 
     for fig in figs:
-        key = s3_storage.put_image_bytes(
+        key = get_storage().put_image_bytes(
             document_id, fig["rel_name"], fig["png_bytes"]
         )
-        fig["s3_key"] = key
+        fig["storage_key"] = key
 
     image_placeholders = [p for p in placeholders if p.type == "image"]
     used_ids: set[str] = set()
@@ -259,7 +259,7 @@ async def enrich_images(
             sec.elements.append(ph)
             placeholders.append(ph)
         used_ids.add(ph.id)
-        ph.extra["path"] = str(fig.get("s3_key", ""))
+        ph.extra["path"] = str(fig.get("storage_key", ""))
         pairings.append((ph, fig))
 
     if not OPENROUTER_API_KEY:

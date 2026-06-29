@@ -7,7 +7,12 @@ import tiktoken
 
 from app.config import CHUNK_OVERLAP, CHUNK_TOKENS
 from app.processing.structure import ElementRef, Section
+from app.processing.tables import count_table_rows
 from app.processing.tree import walk_sections
+from app.storage import get_storage
+
+TABLE_ROW_THRESHOLD = 100
+TABLE_PREVIEW_ROWS = 30
 
 ENC = tiktoken.get_encoding("cl100k_base")
 
@@ -147,22 +152,71 @@ def chunk_table(
     if not markdown and not description:
         return None, next_idx
 
-    header = f"[Table on p.{el.page}]"
+    data_rows, ncols = count_table_rows(markdown)
+    table_index = next_idx  # stable index used in the file path
+
+    pr = el.extra.get("page_range", [el.page, el.page])
+    if isinstance(pr, list) and len(pr) == 2 and pr[0] != pr[1]:
+        header = f"[Table on pp.{pr[0]}-{pr[1]}]"
+    else:
+        header = f"[Table on p.{el.page}]"
     if caption_source:
         header += f" {caption_source}"
-    embed_parts = [header]
-    if description:
-        embed_parts.append(description)
-    if markdown:
-        embed_parts.append(markdown[:3000])
-    embed = "\n".join(embed_parts)
 
-    display_parts = [header]
-    if description:
-        display_parts.append(description)
-    if markdown:
-        display_parts.append(markdown)
-    display = "\n\n".join(display_parts)
+    # ── Small / medium table: full markdown in Qdrant ─────────────────
+    if data_rows <= TABLE_ROW_THRESHOLD:
+        embed_parts = [header]
+        if description:
+            embed_parts.append(description)
+        if markdown:
+            embed_parts.append(markdown[:3000])
+        embed = "\n".join(embed_parts)
+
+        display_parts = [header]
+        if description:
+            display_parts.append(description)
+        if markdown:
+            display_parts.append(markdown)
+        display = "\n\n".join(display_parts)
+
+        extra: dict[str, Any] = {
+            "caption": caption_source,
+            "table_rows": data_rows,
+            "table_cols": ncols,
+        }
+
+    # ── Large table: descriptor + preview in Qdrant, full md on disk ───
+    else:
+        lines = markdown.strip().splitlines()
+        preview_end = min(len(lines), 2 + TABLE_PREVIEW_ROWS)
+        preview_md = "\n".join(lines[:preview_end])
+        remaining = data_rows - TABLE_PREVIEW_ROWS
+
+        embed_parts = [header]
+        if description:
+            embed_parts.append(description)
+        embed_parts.append(preview_md[:3000])
+        embed = "\n".join(embed_parts)
+
+        display_parts = [header]
+        if description:
+            display_parts.append(description)
+        display_parts.append(preview_md)
+        display_parts.append(
+            f"\n[Full table has {remaining} more rows — stored on disk]"
+        )
+        display = "\n\n".join(display_parts)
+
+        table_path = get_storage().put_table_markdown(
+            doc_id, table_index, markdown
+        )
+        extra = {
+            "caption": caption_source,
+            "table_rows": data_rows,
+            "table_cols": ncols,
+            "table_path": table_path,
+            "table_truncated": True,
+        }
 
     cid = mk_id(doc_id, "table", str(next_idx))
     return (
@@ -177,7 +231,7 @@ def chunk_table(
             display_text=display,
             bbox=list(el.bbox) if el.bbox else None,
             page_size=list(el.page_size) if el.page_size else None,
-            extra={"caption": caption_source},
+            extra=extra,
         ),
         next_idx + 1,
     )

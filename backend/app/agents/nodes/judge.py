@@ -3,35 +3,19 @@ from __future__ import annotations
 import time
 from typing import Any
 
-import httpx
-from pydantic import ValidationError
+from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.agents.clients import openrouter_json
-from app.agents.state import GraphState, JudgeResult
+from app.agents.llm import create_llm
+from app.agents.prompts import get_judge_prompt
+from app.agents.schemas import JudgeResult
+from app.agents.state import GraphState
 from app.config import (
     AGENT_MAX_RETRIES,
     JUDGE_MODEL,
     JUDGE_PASS_THRESHOLD,
-    JUDGE_REQUEST_TIMEOUT,
 )
 
-SYSTEM = (
-    "You are an impartial evaluator of retrieval-augmented answers.  Excerpts "
-    "may come from more than one PDF; evaluate whether the answer uses the "
-    "right material for each claim.  Given the original question, the "
-    "retrieved excerpts, and the assistant's answer, score the answer on three "
-    "0-10 axes:\n\n"
-    "  - groundedness:  every factual claim is traceable to the excerpts\n"
-    "  - relevance:     the answer actually addresses the question\n"
-    "  - completeness:  supporting detail from excerpts is not omitted\n\n"
-    "Also list concrete concerns (unsupported claims, missing evidence, "
-    "hallucinations), and pick a verdict:\n"
-    '  "pass"   -- answer is good enough to show the user\n'
-    '  "retry"  -- retrieval missed; try a different retrieval strategy\n'
-    '  "reject" -- answer should not be shown (e.g. clearly hallucinated)\n\n'
-    'Return STRICT JSON only: {"groundedness": int, "relevance": int, '
-    '"completeness": int, "concerns": [str, ...], "verdict": "pass|retry|reject"}.'
-)
+log = __import__("logging").getLogger(__name__)
 
 
 def render_user(state: GraphState) -> str:
@@ -45,21 +29,18 @@ def render_user(state: GraphState) -> str:
 
 async def run(state: GraphState) -> dict[str, Any]:
     t0 = time.time()
-    async with httpx.AsyncClient() as client:
-        parsed = await openrouter_json(
-            client,
-            model=JUDGE_MODEL,
-            system=SYSTEM,
-            user=render_user(state),
-            timeout=JUDGE_REQUEST_TIMEOUT,
-        )
+    llm = create_llm(JUDGE_MODEL)
+    structured = llm.with_structured_output(JudgeResult, method="json_mode")
+    messages = [
+        SystemMessage(content=get_judge_prompt()),
+        HumanMessage(content=render_user(state)),
+    ]
 
     result = JudgeResult(verdict="pass")
-    if isinstance(parsed, dict):
-        try:
-            result = JudgeResult.model_validate(parsed)
-        except ValidationError:
-            pass
+    try:
+        result = await structured.ainvoke(messages)
+    except Exception:
+        log.debug("judge structured output failed; defaulting to pass", exc_info=True)
 
     attempts = state.get("attempts", 0)
     effective_verdict = result.verdict

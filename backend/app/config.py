@@ -37,7 +37,7 @@ TABLE_DESCRIBER_MODEL = os.getenv("TABLE_DESCRIBER_MODEL", OLLAMA_MODEL)
 
 METADATA_PROVIDER = os.getenv("METADATA_PROVIDER", "openrouter").lower()
 METADATA_OPENROUTER_MODEL = os.getenv(
-    "METADATA_OPENROUTER_MODEL", "google/gemini-2.5-flash"
+    "METADATA_OPENROUTER_MODEL", "openai/gpt-oss-120b"
 )
 METADATA_OPENROUTER_INPUT_TOKEN_BUDGET = int(
     os.getenv("METADATA_OPENROUTER_INPUT_TOKEN_BUDGET", "120000")
@@ -137,6 +137,9 @@ CORS_ALLOW_ORIGINS: list[str] = _cors_origins()
 
 # PostgreSQL (e.g. postgresql://lumen:lumen@127.0.0.1:5432/lumen) — `docker compose` in backend/
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+
+# Storage backend: "local" for dev (filesystem), "s3" for staging/production
+STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "local").strip()
 
 S3_BUCKET = os.getenv("S3_BUCKET", "").strip()
 S3_KEY_PREFIX = os.getenv("S3_KEY_PREFIX", "documents").strip().strip("/") or "documents"

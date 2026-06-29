@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any
 
 from app import document_data
 from app.agents.state import GraphState
 from app.config import (
+    MAX_CONTEXT_CHARS,
     RERANK_ENABLED,
     RERANK_RECALL_LIMIT,
     RETRIEVAL_TOP_K,
 )
 from app.processing import embeddings, rerank, vectorstore
+from app.storage import get_storage
 
 
 def scope_document_ids(state: GraphState) -> list[str]:
@@ -125,6 +128,7 @@ async def format_context(hits: list[dict[str, Any]]) -> str:
             key_order.append(k)
         grouped[k].append(h)
 
+    context_chars = 0
     blocks: list[str] = []
     for did, sp in key_order:
         rows = grouped[(did, sp)]
@@ -139,7 +143,26 @@ async def format_context(hits: list[dict[str, Any]]) -> str:
         blocks.append(head)
         for r in rows:
             header = f"[p.{r.get('page', '?')}]"
-            blocks.append(f"{header}\n{r.get('display_text', '')}")
+            display = r.get("display_text", "")
+
+            # Hydrate truncated tables from disk storage when it fits
+            if r.get("table_truncated") and r.get("table_path"):
+                try:
+                    full_md = await asyncio.to_thread(
+                        get_storage().get_table_markdown,
+                        did,
+                        str(r["table_path"]),
+                    )
+                    # Only include full table if it won't blow the context budget
+                    if context_chars + len(full_md) < MAX_CONTEXT_CHARS:
+                        display = full_md
+                    # Otherwise keep the preview (already in display_text)
+                except FileNotFoundError:
+                    pass  # keep preview from display_text
+
+            block = f"{header}\n{display}"
+            blocks.append(block)
+            context_chars += len(block)
     return "\n\n".join(blocks)
 
 

@@ -1,5 +1,5 @@
 """
-Async access to per-document state (Postgres + S3 for PDFs/images).
+Async access to per-document state (Postgres + storage backend for PDFs/images).
 Replaces the former `app.store` filesystem under CHATPDF_DATA_DIR.
 """
 
@@ -15,7 +15,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import s3_storage
+from app.storage import get_storage
 from app.db.repositories.document_state import (
     DocumentStateRepository,
     DocumentStatus,
@@ -38,7 +38,7 @@ __all__ = [
     "save_document_meta",
     "save_sections_index",
     "save_tree",
-    "save_upload_to_s3_and_db",
+    "save_upload_and_record",
     "set_status",
     "update_status",
 ]
@@ -158,8 +158,8 @@ async def delete_document_artifacts(document_id: str) -> None:
 
 
 def pull_source_pdf_to_tempfile(document_id: str) -> Path:
-    """Sync: download S3 to temp; used from asyncio.to_thread in the pipeline."""
-    data = s3_storage.get_source_pdf_bytes(document_id)
+    """Sync: download source PDF to temp; used from asyncio.to_thread in the pipeline."""
+    data = get_storage().get_source_pdf_bytes(document_id)
     fd, name = tempfile.mkstemp(suffix=".pdf", prefix="chatpdf-src-")
     try:
         with os.fdopen(fd, "wb", closefd=True) as f:
@@ -180,11 +180,11 @@ def release_source_temp_path(path: Path) -> None:
         pass
 
 
-async def save_upload_to_s3_and_db(
+async def save_upload_and_record(
     data: bytes, filename: str
 ) -> str:
     document_id = str(uuid.uuid4())
-    s3_storage.put_source_pdf_bytes(document_id, data)
+    get_storage().put_source_pdf_bytes(document_id, data)
     st = DocumentStatus(
         status="queued",
         stage="queued",

@@ -3,41 +3,17 @@ from __future__ import annotations
 import time
 from typing import Any
 
-import httpx
-from pydantic import ValidationError
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from app import document_data
-from app.agents.clients import openrouter_json
-from app.agents.state import GraphState, RouterPlan
-from app.config import ROUTER_MODEL, ROUTER_REQUEST_TIMEOUT
+from app.agents.llm import create_llm
+from app.agents.prompts import get_router_prompt
+from app.agents.schemas import RouterPlan
+from app.agents.state import GraphState
+from app.config import ROUTER_MODEL
 from app.processing.metadata import normalize_title
 
-SYSTEM = (
-    "You are a retrieval planner for a PDF question-answering system.\n\n"
-    "One or more documents may be in scope. Each document has its own table of "
-    "contents below. When route is structural or hybrid, you MUST use "
-    "namespaced section IDs: `document_id:local_section_id` (both strings come "
-    "from the TOC: use the `document_id` line for that document, and the `id` "
-    "in brackets for the section). Never use a raw local section_id alone when "
-    "more than one document is in scope.\n\n"
-    "Given the documents' table of contents with per-section summaries,\n"
-    "  optional per-document metadata (title, abstract, doc_type),\n"
-    "  the user's current query and recent chat history,\n\n"
-    "pick the best retrieval strategy:\n"
-    "  * structural -- user refers to specific named sections/chapters/tables/"
-    "figures (e.g. 'summarize the introduction', 'what does section 3 say').\n"
-    "  * semantic   -- user asks about content; vector search works best.\n"
-    "  * hybrid     -- both apply (e.g. 'compare the abstract and conclusion').\n\n"
-    "When route is structural or hybrid, list the namespaced section_ids that "
-    "should be pulled.  Always emit a concise `rewritten_query` that is "
-    "self-contained for vector search.\n\n"
-    "Respond with STRICT JSON only: "
-    '{"route": "structural|semantic|hybrid", '
-    '"section_ids": ["doc-uuid:sec-...", ...], '
-    '"keywords": ["..."], '
-    '"rewritten_query": "...", '
-    '"rationale": "<=120 chars"}.'
-)
+log = __import__("logging").getLogger(__name__)
 
 
 def scope_document_ids(state: GraphState) -> list[str]:
@@ -144,21 +120,18 @@ async def run(state: GraphState) -> dict[str, Any]:
         prev_route = (state.get("plan") or {}).get("route")
         avoid_route = prev_route
 
-    async with httpx.AsyncClient() as client:
-        parsed = await openrouter_json(
-            client,
-            model=ROUTER_MODEL,
-            system=SYSTEM,
-            user=await render_user(state, avoid_route=avoid_route),
-            timeout=ROUTER_REQUEST_TIMEOUT,
-        )
+    llm = create_llm(ROUTER_MODEL)
+    structured = llm.with_structured_output(RouterPlan, method="json_mode")
+    messages = [
+        SystemMessage(content=get_router_prompt()),
+        HumanMessage(content=await render_user(state, avoid_route=avoid_route)),
+    ]
 
     plan = await fallback_heuristic(state)
-    if isinstance(parsed, dict):
-        try:
-            plan = RouterPlan.model_validate(parsed)
-        except ValidationError:
-            pass
+    try:
+        plan = await structured.ainvoke(messages)
+    except Exception:
+        log.debug("router structured output failed; using fallback", exc_info=True)
 
     if avoid_route and plan.route == avoid_route:
         plan = plan.model_copy(update={"route": "hybrid"})

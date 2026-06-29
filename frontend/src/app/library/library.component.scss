@@ -195,14 +195,6 @@ $lumen-primary: #000;
 
 .lumen-recent-files__header {
   display: none;
-  @media (min-width: 768px) {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 2.5rem);
-    gap: 0.5rem 1rem;
-    align-items: center;
-    padding: 0.5rem 1.25rem 0.75rem;
-    border-bottom: 1px solid rgba($lumen-outline-variant, 0.4);
-  }
   font-size: 0.625rem;
   line-height: 1.2;
   font-weight: 500;
@@ -211,6 +203,14 @@ $lumen-primary: #000;
   color: $lumen-secondary;
   box-sizing: border-box;
   opacity: 0.9;
+  @media (min-width: 768px) {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 2.5rem);
+    gap: 0.5rem 1rem;
+    align-items: center;
+    padding: 0.5rem 1.25rem 0.75rem;
+    border-bottom: 1px solid rgba($lumen-outline-variant, 0.4);
+  }
 }
 
 .lumen-recent-files__header .lumen-recent-files__col--name {
@@ -265,6 +265,11 @@ $lumen-primary: #000;
   display: block;
   margin: 0 0 0.75rem;
   padding: 0;
+  border: 1px solid rgba($lumen-outline-variant, 0.35);
+  border-radius: 0.5rem;
+  background: $lumen-surface-container-lowest;
+  transition: background 0.15s ease;
+  cursor: default;
   @media (min-width: 768px) {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 2.5rem);
@@ -273,19 +278,11 @@ $lumen-primary: #000;
     margin: 0;
     padding: 1.15rem 1.25rem;
     border: none;
-    box-sizing: border-box;
-  }
-  border: 1px solid rgba($lumen-outline-variant, 0.35);
-  border-radius: 0.5rem;
-  background: $lumen-surface-container-lowest;
-  @media (min-width: 768px) {
-    border: none;
     border-bottom: 1px solid rgba($lumen-outline-variant, 0.3);
     border-radius: 0;
     background: transparent;
+    box-sizing: border-box;
   }
-  transition: background 0.15s ease;
-  cursor: default;
 }
 
 .lumen-recent-files__row:hover {
@@ -305,12 +302,12 @@ $lumen-primary: #000;
   align-items: center;
   gap: 0.5rem 1rem;
   padding: 0.9rem 1rem 0.4rem;
+  box-sizing: border-box;
+  min-width: 0;
   @media (min-width: 768px) {
     padding: 0;
     min-width: 0;
   }
-  box-sizing: border-box;
-  min-width: 0;
 }
 
 .lumen-recent-files__row-spinner {
@@ -365,24 +362,24 @@ $lumen-primary: #000;
 .lumen-recent-files__col--size {
   text-align: right;
   font-size: 0.8rem;
-  @media (max-width: 767.98px) {
-    display: none;
-  }
   padding: 0;
   box-sizing: border-box;
   min-width: 0;
+  @media (max-width: 767.98px) {
+    display: none;
+  }
 }
 
 .lumen-recent-files__col--status {
   padding: 0.35rem 1rem 0.85rem;
+  text-align: right;
+  box-sizing: border-box;
+  min-width: 0;
   @media (min-width: 768px) {
     display: flex;
     justify-content: flex-end;
     padding: 0;
   }
-  text-align: right;
-  box-sizing: border-box;
-  min-width: 0;
 }
 
 .lumen-recent-files__muted {

@@ -324,10 +324,14 @@ async def enrich_batch(
         if s.id in out:
             continue
         body = bodies[s.id]
-        out[s.id] = SectionEnrichment(
-            summary=heuristic_summary(body) if body else "",
-            keywords=heuristic_keywords(body) if body else [],
-        )
+        if body:
+            summary = heuristic_summary(body)
+            keywords = heuristic_keywords(body)
+        else:
+            # Title-only section — fall back to the title itself for keywords
+            summary = ""
+            keywords = heuristic_keywords(s.title) if s.title else []
+        out[s.id] = SectionEnrichment(summary=summary, keywords=keywords)
     return out
 
 
@@ -694,7 +698,6 @@ def merge_parsed_openrouter_index(
 
 
 async def openrouter_enrich_one_chunk(
-    client: httpx.AsyncClient,
     idx: int,
     chunk_sections: list[Section],
     *,
@@ -712,7 +715,6 @@ async def openrouter_enrich_one_chunk(
         chunk_total=chunk_total,
     )
     parsed = await openrouter_json(
-        client,
         model=METADATA_OPENROUTER_MODEL,
         system=FULL_ENRICHMENT_SYSTEM,
         user=user,
@@ -757,22 +759,23 @@ async def enrich_via_openrouter(
 
     by_id: dict[str, SectionEnrichment] = {}
     n = len(chunks)
-    async with httpx.AsyncClient() as client:
-        results = await asyncio.gather(
-            *(
-                openrouter_enrich_one_chunk(
-                    client,
-                    i,
-                    c,
-                    all_sections=sections,
-                    filename=filename,
-                    num_pages=num_pages,
-                    chunk_total=n,
-                )
-                for i, c in enumerate(chunks)
-            ),
-            return_exceptions=True,
-        )
+    sem = asyncio.Semaphore(max(1, METADATA_CONCURRENCY))
+
+    async def _one_chunk(i: int, c: list[Section]) -> tuple[int, dict[str, Any] | None]:
+        async with sem:
+            return await openrouter_enrich_one_chunk(
+                i,
+                c,
+                all_sections=sections,
+                filename=filename,
+                num_pages=num_pages,
+                chunk_total=n,
+            )
+
+    results = await asyncio.gather(
+        *(_one_chunk(i, c) for i, c in enumerate(chunks)),
+        return_exceptions=True,
+    )
 
     any_chunk_parsed, parsed_by_idx = partition_openrouter_chunk_results(results, n)
     if not any_chunk_parsed:
@@ -785,10 +788,15 @@ async def enrich_via_openrouter(
         if s.id in by_id:
             continue
         body = section_body_text(s, limit_chars=1200)
-        by_id[s.id] = SectionEnrichment(
-            summary=heuristic_summary(body) if body else "",
-            keywords=heuristic_keywords(body) if body else [],
-        )
+        if body:
+            summary = heuristic_summary(body)
+            keywords = heuristic_keywords(body)
+        else:
+            # Title-only section — fall back to the title itself for keywords
+            # so the section is at least findable by name in the router.
+            summary = ""
+            keywords = heuristic_keywords(s.title) if s.title else []
+        by_id[s.id] = SectionEnrichment(summary=summary, keywords=keywords)
 
     sections_index = assemble_sections_index(sections, by_id)
     doc_meta = assemble_document_meta(

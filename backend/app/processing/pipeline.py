@@ -17,6 +17,7 @@ from app.processing import (
     vectorstore,
 )
 from app.processing.structure import Section
+from app.storage import get_storage
 
 log = logging.getLogger(__name__)
 
@@ -31,11 +32,19 @@ def spawn_background(coro) -> None:
 
 
 async def process_document(doc_id: str) -> None:
+    # Captured during the main pipeline; consumed by enrichment after the
+    # document is marked ready.
+    _enrich_root: Section | None = None
+    _enrich_filename: str = ""
+    _enrich_num_pages: int = 0
+
     async with document_data.document_db_session() as (session, repo):
         status = await repo.get_status(doc_id)
         if status is None:
             log.error("process_document: unknown doc_id %s", doc_id)
             return
+
+        _enrich_filename = status.filename
 
         try:
             pdf = await asyncio.to_thread(
@@ -72,6 +81,8 @@ async def process_document(doc_id: str) -> None:
             root, elements, num_pages, part_warnings = await asyncio.to_thread(
                 structure.partition, pdf
             )
+            _enrich_root = root
+            _enrich_num_pages = num_pages
             await repo.update_status(
                 doc_id,
                 num_pages=num_pages,
@@ -84,7 +95,7 @@ async def process_document(doc_id: str) -> None:
                 doc_id, status="tables", stage="extracting tables", progress=0.35
             )
             await session.commit()
-            await tables.enrich_tables(pdf, elements)
+            await tables.enrich_tables(pdf, root, elements)
 
             await repo.update_status(
                 doc_id, status="images", stage="captioning figures", progress=0.55
@@ -99,6 +110,7 @@ async def process_document(doc_id: str) -> None:
             )
             await repo.save_tree(doc_id, tree_json)
             await session.commit()
+            get_storage().put_debug_json(doc_id, "structure_tree", tree_json)
 
             await repo.update_status(
                 doc_id,
@@ -108,6 +120,24 @@ async def process_document(doc_id: str) -> None:
             )
             await session.commit()
             chunks = chunking.build_chunks(root, doc_id)
+            get_storage().put_debug_json(
+                doc_id,
+                "chunks",
+                [
+                    {
+                        "chunk_id": c.chunk_id,
+                        "type": c.type,
+                        "page": c.page,
+                        "section_path": c.section_path,
+                        "text_for_embedding": c.text_for_embedding,
+                        "display_text": c.display_text,
+                        "bbox": c.bbox,
+                        "page_size": c.page_size,
+                        "extra": c.extra,
+                    }
+                    for c in chunks
+                ]
+            )
             if chunks:
                 await vectorstore.ensure_collection()
                 vectors = await embeddings.embed_texts(
@@ -119,10 +149,6 @@ async def process_document(doc_id: str) -> None:
                 doc_id, status="ready", stage="ready", progress=1.0
             )
             await session.commit()
-
-            spawn_background(
-                enrich_in_background(doc_id, root, status.filename, num_pages)
-            )
         except Exception as e:
             log.exception("process_document failed for %s", doc_id)
             try:
@@ -141,6 +167,19 @@ async def process_document(doc_id: str) -> None:
                 document_data.release_source_temp_path, pdf
             )
 
+    # Enrichment runs *after* the document is ready so that chunk retrieval
+    # works immediately.  Failures here are non-fatal — the document is
+    # already queryable; only metadata quality is degraded.
+    if _enrich_root is not None:
+        try:
+            await enrich_in_background(
+                doc_id, _enrich_root, _enrich_filename, _enrich_num_pages
+            )
+        except Exception:
+            log.exception(
+                "enrichment failed for %s (document is still ready)", doc_id
+            )
+
 
 async def enrich_in_background(
     doc_id: str, root: Section, filename: str, num_pages: int
@@ -155,6 +194,8 @@ async def enrich_in_background(
         )
         await document_data.save_sections_index(doc_id, sections_index)
         await document_data.save_document_meta(doc_id, doc_meta)
+        get_storage().put_debug_json(doc_id, "sections_index", sections_index)
+        get_storage().put_debug_json(doc_id, "metadata", doc_meta)
         log.info(
             "background enrichment done for %s (%d sections)",
             doc_id,
