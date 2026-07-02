@@ -17,7 +17,7 @@ class GuardrailResult(BaseModel):
     """Result of the guardrail safety classifier."""
 
     allow: bool
-    category: Literal["ok", "jailbreak", "inappropriate", "out_of_scope"] = "ok"
+    category: Literal["ok", "jailbreak", "inappropriate", "harmful"] = "ok"
     reason: str = ""
 
     model_config = {"extra": "ignore", "str_strip_whitespace": True}
@@ -31,6 +31,29 @@ class RouterPlan(BaseModel):
     keywords: list[str] = Field(default_factory=list)
     rewritten_query: str = ""
     rationale: str = ""
+    needs_vision: bool = False
+    vision_pages: list[int] = Field(default_factory=list)
+    query_variants: list[str] = Field(default_factory=list)
+    
+    # Query interpretation fields
+    query_intent: str = ""  # "summary", "comparison", "trend", "specific_data", "explanation"
+    key_entities: list[str] = Field(default_factory=list)  # Entities mentioned in query
+    target_sections: list[str] = Field(default_factory=list)  # Section IDs or patterns to focus on
+    
+    # Constraint fields — accept None from LLM output
+    time_range_start: str | None = None
+    time_range_end: str | None = None
+    time_range_description: str | None = None
+
+    # Document-specific fields
+    data_type: str | None = None
+    multi_document_strategy: str | None = "single"
+
+    # Human-readable description of all constraints
+    constraints_description: str | None = None
+    
+    # Key decisions reasoning (for streaming to frontend)
+    reasoning: str = ""
 
     model_config = {"extra": "ignore", "str_strip_whitespace": True}
 

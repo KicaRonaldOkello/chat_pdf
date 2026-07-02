@@ -91,12 +91,57 @@ def token_split(text: str, target: int, overlap: int) -> list[str]:
     return out
 
 
+def _heuristic_table_descriptor(markdown: str, *, max_items: int = 25) -> str:
+    """Build a keyword-rich descriptor from row labels in *markdown*.
+
+    Used as a fallback when the LLM-generated table description is empty.
+    Extracts the first two columns (typically an indicator code + label)
+    and emits a dense line that anchors the embedding for topical queries.
+    """
+    lines = markdown.strip().splitlines()
+    labels: list[str] = []
+    seen: set[str] = set()
+    for line in lines:
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.split("|")[1:-1]]
+        if len(cells) < 2:
+            continue
+        # Skip separator rows, sub-headers, and noise
+        if all(c.replace("-", "").replace(":", "").strip() == "" for c in cells if c):
+            continue
+        # Prefer col-1 (description); fall back to col-0 (code)
+        label = cells[1] or cells[0]
+        if not label or len(label) < 5:
+            continue
+        # Skip generic labels that are clearly not indicator names
+        low = label.lower()
+        if low in ("description", "indicator", "indicator code", "code"):
+            continue
+        # Normalise and deduplicate
+        key = low
+        if key in seen:
+            continue
+        seen.add(key)
+        # Truncate long labels conservatively
+        labels.append(label[:200])
+        if len(labels) >= max_items:
+            break
+    if not labels:
+        return ""
+    return "Key indicators: " + "; ".join(labels)
+
+
 def mk_id(doc_id: str, *parts: str) -> str:
     return f"{doc_id}::" + "::".join(parts)
 
 
 def chunk_section_text(
-    section: Section, doc_id: str, next_idx: int
+    section: Section,
+    doc_id: str,
+    next_idx: int,
+    *,
+    watermark_texts: set[str] | None = None,
 ) -> tuple[list[Chunk], int]:
     text_els = [e for e in section.elements if e.type in ("text", "formula")]
     if not text_els:
@@ -105,8 +150,9 @@ def chunk_section_text(
     blob_parts: list[str] = []
     element_ids: list[str] = []
     first_page = section.page_range[0]
+    _skip = watermark_texts or set()
     for e in text_els:
-        if not e.text:
+        if not e.text or e.text in _skip:
             continue
         blob_parts.append(e.text)
         element_ids.append(e.id)
@@ -153,6 +199,29 @@ def chunk_table(
         return None, next_idx
 
     data_rows, ncols = count_table_rows(markdown)
+
+    # ── Per-element table validation ────────────────────────────────
+    # Skip phantom tables that camelot finds in scanned/image pages.
+    # These have garbled single-column content with no real data.
+    if ncols <= 1 and markdown and data_rows <= 1:
+        import re as _re
+
+        _cells = [
+            c.strip()
+            for line in markdown.splitlines()
+            if line.startswith("|")
+            for c in line.split("|")[1:-1]
+        ]
+        _nonempty = [c for c in _cells if c and c != "---"]
+        if _nonempty:
+            _garbled = sum(
+                1
+                for c in _nonempty
+                if " " not in c and len(c) > 15 and _re.search(r"[^\w\s]", c)
+            )
+            if _garbled / len(_nonempty) > 0.5:
+                return None, next_idx
+
     table_index = next_idx  # stable index used in the file path
 
     pr = el.extra.get("page_range", [el.page, el.page])
@@ -162,6 +231,12 @@ def chunk_table(
         header = f"[Table on p.{el.page}]"
     if caption_source:
         header += f" {caption_source}"
+
+    # When the LLM-generated description is empty or missing, build a
+    # heuristic one from row labels so the embedding has focused keywords
+    # near the top instead of being diluted by the full markdown.
+    if not description and markdown:
+        description = _heuristic_table_descriptor(markdown, max_items=25)
 
     # ── Small / medium table: full markdown in Qdrant ─────────────────
     if data_rows <= TABLE_ROW_THRESHOLD:
@@ -242,14 +317,39 @@ def chunk_image(
 ) -> tuple[Chunk | None, int]:
     caption = str(el.extra.get("caption") or el.text or "")
     description = str(el.extra.get("description") or "")
-    if not caption and not description:
+    image_path = str(el.extra.get("path") or "")
+    vision_analyzed = bool(el.extra.get("vision_analyzed", False))
+
+    # Skip only if there is literally nothing to embed — no image file,
+    # no caption, and no section context.
+    if not image_path and not caption and not section.path:
         return None, next_idx
 
     header = f"[Figure on p.{el.page}]"
     if caption:
         header += f" {caption}"
-    embed = header + ("\n" + description if description else "")
-    display = embed
+
+    # Embedding signal — always includes section context so the image is
+    # retrievable even before vision analysis runs.  For unanalysed images
+    # we also pull a short snippet of nearby text so that topical keywords
+    # (e.g. "inflation", "exchange rate") anchor the vector.
+    embed_parts = [header]
+    if description:
+        embed_parts.append(description)
+    else:
+        embed_parts.append(f"Section: {section.path}")
+        # Nearby text from the same page — pre-computed during ingestion
+        # so image chunks have topical keywords for retrieval.
+        nearby = str(el.extra.get("nearby_text") or "")
+        if nearby:
+            embed_parts.append(f"Nearby text: {nearby[:500]}")
+        embed_parts.append("Visual analysis available on demand.")
+
+    display_parts = [header]
+    if description:
+        display_parts.append(description)
+    elif not vision_analyzed:
+        display_parts.append("(Visual analysis available on demand)")
 
     cid = mk_id(doc_id, "image", str(next_idx))
     return (
@@ -260,17 +360,36 @@ def chunk_image(
             type="image",
             section_path=section.path,
             page=el.page,
-            text_for_embedding=embed,
-            display_text=display,
+            text_for_embedding="\n".join(embed_parts),
+            display_text="\n".join(display_parts),
             bbox=list(el.bbox) if el.bbox else None,
             page_size=list(el.page_size) if el.page_size else None,
             extra={
                 "caption": caption,
-                "image_path": el.extra.get("path", ""),
+                "image_path": image_path,
+                "vision_analyzed": vision_analyzed,
             },
         ),
         next_idx + 1,
     )
+
+
+def _find_watermark_texts(sections: list[Section]) -> set[str]:
+    """Return the set of text blobs that appear identically on 3+ pages.
+
+    Scanned PDFs often have a header/footer watermark on every page
+    (e.g. \"Downloaded by John Lyomoki...\").  Embedding these 50+ times
+    wastes time and pollutes retrieval.
+    """
+    from collections import Counter
+
+    blob_pages: dict[str, set[int]] = {}
+    for sec in sections:
+        for el in sec.elements:
+            if el.type == "text" and el.text and len(el.text) > 30:
+                first_page = el.page
+                blob_pages.setdefault(el.text, set()).add(first_page)
+    return {blob for blob, pages in blob_pages.items() if len(pages) >= 3}
 
 
 def build_chunks(root: Section, document_id: str) -> list[Chunk]:
@@ -278,10 +397,14 @@ def build_chunks(root: Section, document_id: str) -> list[Chunk]:
     if not sections or any(e.type != "text" for e in root.elements):
         sections.insert(0, root)
 
+    watermark_texts = _find_watermark_texts(sections)
+
     out: list[Chunk] = []
     idx = 0
     for sec in sections:
-        text_chunks, idx = chunk_section_text(sec, document_id, idx)
+        text_chunks, idx = chunk_section_text(
+            sec, document_id, idx, watermark_texts=watermark_texts
+        )
         out.extend(text_chunks)
         for el in sec.elements:
             if el.type == "table":

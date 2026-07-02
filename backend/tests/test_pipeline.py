@@ -13,11 +13,9 @@ from app.processing.pipeline import process_document
 from app.processing.structure import ElementRef, Section
 
 
-def _discard_background_task(coro) -> None:
-    """spawn_background receives a coroutine; if the real scheduler is patched out, close it."""
-    close = getattr(coro, "close", None)
-    if callable(close):
-        close()
+async def _noop_enrich(*args, **kwargs) -> None:
+    """Stand-in for enrich_in_background — runs inline, does nothing."""
+    return None
 
 
 def _minimal_root() -> Section:
@@ -62,15 +60,15 @@ async def test_process_document_unknown_doc_returns_early() -> None:
             new_callable=MagicMock,
         ) as release,
         patch(
-            "app.processing.pipeline.spawn_background",
-            side_effect=_discard_background_task,
-        ) as bg,
+            "app.processing.pipeline.enrich_in_background",
+            new_callable=AsyncMock,
+        ) as enrich,
     ):
         await process_document("missing-id")
 
     pull.assert_not_called()
     release.assert_not_called()
-    bg.assert_not_called()
+    enrich.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -101,9 +99,9 @@ async def test_process_document_pull_failure_sets_error_status() -> None:
             new_callable=MagicMock,
         ) as release,
         patch(
-            "app.processing.pipeline.spawn_background",
-            side_effect=_discard_background_task,
-        ) as bg,
+            "app.processing.pipeline.enrich_in_background",
+            new_callable=AsyncMock,
+        ) as enrich,
     ):
         await process_document("doc-1")
 
@@ -116,11 +114,11 @@ async def test_process_document_pull_failure_sets_error_status() -> None:
     assert st.error is not None
     session.commit.assert_awaited()
     release.assert_not_called()
-    bg.assert_not_called()
+    enrich.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_process_document_happy_path_ready_and_spawns_background() -> None:
+async def test_process_document_happy_path_ready_and_awaits_enrichment() -> None:
     root = _minimal_root()
     repo = MagicMock()
     repo.get_status = AsyncMock(
@@ -158,9 +156,9 @@ async def test_process_document_happy_path_ready_and_spawns_background() -> None
             "app.processing.pipeline.vectorstore.upsert_chunks", new_callable=AsyncMock
         ) as upsert,
         patch(
-            "app.processing.pipeline.spawn_background",
-            side_effect=_discard_background_task,
-        ) as bg,
+            "app.processing.pipeline.enrich_in_background",
+            new_callable=AsyncMock,
+        ) as enrich,
     ):
         await process_document("doc-42")
 
@@ -171,4 +169,4 @@ async def test_process_document_happy_path_ready_and_spawns_background() -> None
     assert final.args[0] == "doc-42"
     assert final.kwargs.get("status") == "ready"
     assert final.kwargs.get("progress") == 1.0
-    bg.assert_called_once()
+    enrich.assert_awaited_once()

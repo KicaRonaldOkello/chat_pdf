@@ -4,11 +4,9 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-import httpx
-
 from app.config import (
-    OLLAMA_OPENAI_API_KEY,
-    OLLAMA_OPENAI_BASE_URL,
+    OPENROUTER_API_KEY,
+    OPENROUTER_BASE_URL,
     SLOW_UPSTREAM_REQUEST_TIMEOUT,
     TABLE_DESCRIBER_MODEL,
 )
@@ -485,32 +483,50 @@ def match_to_placeholder(
 
 
 async def describe_one(
-    client: httpx.AsyncClient,
     markdown: str,
     page_range: list[int] | None = None,
 ) -> str:
+    """Generate a keyword-rich description of *markdown* via OpenRouter.
+
+    Uses the OpenAI SDK so that provider-specific parameters (reasoning)
+    travel through ``extra_body``.
+    """
+    from openai import AsyncOpenAI
+
+    if not OPENROUTER_API_KEY:
+        return ""
+
     snippet = _build_describe_snippet(markdown, page_range)
-    payload = {
-        "model": TABLE_DESCRIBER_MODEL,
-        "messages": [
-            {
-                "role": "user",
-                "content": DESCRIBE_PROMPT.format(markdown=snippet[:6000]),
-            }
-        ],
-        "stream": False,
-    }
+    client = AsyncOpenAI(
+        base_url=OPENROUTER_BASE_URL,
+        api_key=OPENROUTER_API_KEY,
+        default_headers={
+            "HTTP-Referer": "https://localhost/chat-pdf",
+            "X-Title": "chat_pdf table description",
+        },
+        timeout=SLOW_UPSTREAM_REQUEST_TIMEOUT,
+    )
     try:
-        r = await client.post(
-            f"{OLLAMA_OPENAI_BASE_URL}/chat/completions",
-            json=payload,
-            headers={"Authorization": f"Bearer {OLLAMA_OPENAI_API_KEY}"},
-            timeout=SLOW_UPSTREAM_REQUEST_TIMEOUT,
+        response = await client.chat.completions.create(
+            model=TABLE_DESCRIBER_MODEL,
+            messages=[
+                {
+                    "role": "user",
+                    "content": DESCRIBE_PROMPT.format(markdown=snippet[:6000]),
+                }
+            ],
+            extra_body={"reasoning": {"effort": "minimal"}},
         )
-        r.raise_for_status()
-        data = r.json()
-        return str(data["choices"][0]["message"]["content"]).strip()
+        return str(response.choices[0].message.content or "").strip()
     except Exception:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "table describe_one failed (model=%s, timeout=%.0fs)",
+            TABLE_DESCRIBER_MODEL,
+            SLOW_UPSTREAM_REQUEST_TIMEOUT,
+            exc_info=True,
+        )
         return ""
 
 
@@ -600,12 +616,23 @@ async def enrich_tables(
     if not to_describe:
         return
 
-    async with httpx.AsyncClient() as client:
-        descriptions = await asyncio.gather(
-            *[describe_one(client, md, page_range=pr) for _, md, pr in to_describe]
-        )
+    descriptions = await asyncio.gather(
+        *[describe_one(md, page_range=pr) for _, md, pr in to_describe]
+    )
+    succeeded = 0
     for (ph, _, _), desc in zip(to_describe, descriptions, strict=False):
         ph.extra["description"] = desc
+        if desc:
+            succeeded += 1
+    if succeeded < len(to_describe):
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "table description: %d/%d succeeded (model=%s)",
+            succeeded,
+            len(to_describe),
+            TABLE_DESCRIBER_MODEL,
+        )
 
     # 4. Prune text elements that overlap detected table regions ---------------
     removed = _suppress_text_in_table_bboxes(root)

@@ -3,9 +3,12 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 import httpx
 from pydantic import BaseModel, Field, ValidationError, field_validator
@@ -18,6 +21,7 @@ from app.config import (
     VISION_MODEL,
 )
 from app.processing.structure import ElementRef, Section
+from app.processing.tree import walk_sections
 
 CAPTION_PROMPT = (
     "Describe this figure from an uploaded document for a retrieval index. "
@@ -26,6 +30,22 @@ CAPTION_PROMPT = (
     '  "description": 2-3 sentences stating what the figure shows, the type '
     "of visual (diagram, chart, photo, schematic, heatmap, etc.), the axes "
     "or components if relevant, and any labels or legends visible.\n"
+    "Do not include markdown fences. JSON only."
+)
+
+QA_VISION_PROMPT = (
+    "You are analyzing a page from a PDF to help answer the user's question.\n\n"
+    "User question: {query}\n\n"
+    "Look at the page image and return STRICT JSON with:\n"
+    '  "relevant_text": any visible text on the page that relates to the question\n'
+    '  "visual_elements": describe charts, diagrams, tables, signatures, stamps, '
+    " handwriting, or other visual content relevant to the question\n"
+    '  "observations": factual observations that help answer the question\n'
+    '  "confidence": one of "high", "medium", or "low"\n\n'
+    "For charts/tables: read axes, legends, labels, approximate values, trends.\n"
+    "For signatures/stamps: note whether visible; do not infer identity unless "
+    "text is clearly legible.\n"
+    "If the page contains nothing relevant to the question, say so plainly.\n"
     "Do not include markdown fences. JSON only."
 )
 
@@ -112,6 +132,114 @@ def render_images(
     finally:
         doc.close()
     return results
+
+
+def render_page_image(
+    doc_id: str, page: int, *, dpi: int = 200
+) -> bytes:
+    """Render a full PDF page as a PNG image.
+
+    Pulls the source PDF from storage, renders *page* (1-based) with
+    PyMuPDF at *dpi*, and returns PNG bytes.  Used at query time for
+    on-demand visual analysis of pages that may contain charts, diagrams,
+    signatures, or other non-text elements.
+    """
+    import fitz
+
+    pdf_bytes = get_storage().get_source_pdf_bytes(doc_id)
+    # PyMuPDF can open directly from a bytes stream — no temp file needed.
+    doc = None
+    try:
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        page_obj = doc[page - 1]  # 0-based
+        mat = fitz.Matrix(dpi / 72, dpi / 72)
+        pix = page_obj.get_pixmap(matrix=mat)
+        return pix.tobytes("png")
+    finally:
+        if doc is not None:
+            doc.close()
+
+
+async def analyze_page_for_query(
+    doc_id: str,
+    page: int,
+    query: str,
+    *,
+    dpi: int = 200,
+) -> str | None:
+    """Render a page and ask the vision model to analyse it for *query*.
+
+    Returns a human-readable analysis block, or ``None`` if the vision
+    model is unavailable or the page cannot be rendered.
+    """
+    import base64
+
+    if not OPENROUTER_API_KEY:
+        return None
+
+    try:
+        png_bytes = await asyncio.to_thread(
+            render_page_image, doc_id, page, dpi=dpi
+        )
+    except Exception as e:
+        logger.warning(f"Failed to render page {page} for doc {doc_id}: {e}")
+        return None
+
+    data_url = f"data:image/png;base64,{base64.b64encode(png_bytes).decode()}"
+    payload = {
+        "model": VISION_MODEL,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": QA_VISION_PROMPT.format(query=query)},
+                    {"type": "image_url", "image_url": {"url": data_url}},
+                ],
+            }
+        ],
+        "response_format": {"type": "json_object"},
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{OPENROUTER_BASE_URL}/chat/completions",
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                timeout=SLOW_UPSTREAM_REQUEST_TIMEOUT,
+            )
+            r.raise_for_status()
+            data = r.json()
+            raw = str(data["choices"][0]["message"]["content"])
+    except Exception as e:
+        logger.warning(f"Vision API call failed for doc {doc_id} page {page}: {e}")
+        return None
+
+    # Parse the JSON response into a readable block
+    try:
+        import re as _re
+
+        text = raw.strip()
+        text = _re.sub(
+            r"^```(?:json)?\s*|\s*```$", "", text, flags=_re.IGNORECASE | _re.MULTILINE
+        )
+        obj = json.loads(text)
+    except Exception:
+        return f"## Visual analysis — p.{page}\n(Vision model returned unparseable output.)"
+
+    confidence = str(obj.get("confidence", "medium")).lower()
+    lines = [f"## Visual analysis — p.{page}  (confidence: {confidence})"]
+    for key, label in [
+        ("relevant_text", "Visible text"),
+        ("visual_elements", "Visual content"),
+        ("observations", "Observations"),
+    ]:
+        val = str(obj.get(key, "")).strip()
+        if val:
+            lines.append(f"**{label}**: {val}")
+    return "\n".join(lines)
 
 
 def parse_caption_json(raw: str) -> VisionCaption:
@@ -262,16 +390,23 @@ async def enrich_images(
         ph.extra["path"] = str(fig.get("storage_key", ""))
         pairings.append((ph, fig))
 
-    if not OPENROUTER_API_KEY:
-        for ph, _ in pairings:
-            ph.extra.setdefault("caption", ph.text)
-            ph.extra.setdefault("description", "")
-        return
+    # Record image metadata without calling the vision model.
+    # Vision analysis is deferred to query time (Phase D-G).
+    # Pre-compute nearby text from the same page so image chunks have
+    # meaningful embedding signals even before vision runs.
+    _page_text_cache: dict[int, str] = {}
+    for section in walk_sections(root):
+        for el in section.elements:
+            if el.type in ("text",) and el.text:
+                p = el.page
+                existing = _page_text_cache.get(p, "")
+                if len(existing) < 600:
+                    _page_text_cache[p] = (existing + " " + el.text)[:600]
 
-    async with httpx.AsyncClient() as client:
-        results = await asyncio.gather(
-            *[caption_one(client, fig["png_bytes"]) for _, fig in pairings]
-        )
-    for (ph, _), caption in zip(pairings, results, strict=False):
-        ph.extra["caption"] = caption.caption or ph.text
-        ph.extra["description"] = caption.description
+    for ph, _ in pairings:
+        ph.extra.setdefault("caption", ph.text)
+        ph.extra.setdefault("description", "")
+        ph.extra["vision_analyzed"] = False
+        nearby = _page_text_cache.get(ph.page, "")
+        if nearby:
+            ph.extra["nearby_text"] = nearby.strip()

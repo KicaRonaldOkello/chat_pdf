@@ -33,11 +33,12 @@ OPENROUTER_BASE_URL = os.getenv(
 ).rstrip("/")
 VISION_MODEL = os.getenv("VISION_MODEL", "google/gemini-2.5-flash")
 
-TABLE_DESCRIBER_MODEL = os.getenv("TABLE_DESCRIBER_MODEL", OLLAMA_MODEL)
-
 METADATA_PROVIDER = os.getenv("METADATA_PROVIDER", "openrouter").lower()
 METADATA_OPENROUTER_MODEL = os.getenv(
     "METADATA_OPENROUTER_MODEL", "openai/gpt-oss-120b"
+)
+TABLE_DESCRIBER_MODEL = os.getenv(
+    "TABLE_DESCRIBER_MODEL", METADATA_OPENROUTER_MODEL
 )
 METADATA_OPENROUTER_INPUT_TOKEN_BUDGET = int(
     os.getenv("METADATA_OPENROUTER_INPUT_TOKEN_BUDGET", "120000")
@@ -110,12 +111,16 @@ RERANK_ONLY_MULTIPLE = os.getenv("RERANK_ONLY_MULTIPLE", "false").lower() in (
 )
 
 GUARDRAIL_MODEL = os.getenv("GUARDRAIL_MODEL", "google/gemini-2.5-flash-lite")
-ROUTER_MODEL = os.getenv("ROUTER_MODEL", "openai/gpt-oss-120b")
-ANSWERER_MODEL = os.getenv("ANSWERER_MODEL", "openai/gpt-oss-120b")
+ROUTER_MODEL = os.getenv("ROUTER_MODEL", "google/gemini-2.5-flash-lite")
+ROUTER_REASONING_EFFORT = os.getenv("ROUTER_REASONING_EFFORT", "low")  # high, medium, low
+ANSWERER_MODEL = os.getenv("ANSWERER_MODEL", "google/gemini-3.1-flash-lite")
 JUDGE_MODEL = os.getenv("JUDGE_MODEL", "google/gemini-2.5-flash-lite")
 
 JUDGE_PASS_THRESHOLD = int(os.getenv("JUDGE_PASS_THRESHOLD", "7"))
 AGENT_MAX_RETRIES = int(os.getenv("AGENT_MAX_RETRIES", "1"))
+RETRIEVAL_MAX_RETRIES = int(os.getenv("RETRIEVAL_MAX_RETRIES", "2"))
+
+IMAGE_AUTO_VISION_SCORE = float(os.getenv("IMAGE_AUTO_VISION_SCORE", "0.75"))
 
 # Clerk session JWT verification (POST /api/users/sync, future protected routes)
 CLERK_JWKS_URL = os.getenv("CLERK_JWKS_URL", "").rstrip("/")

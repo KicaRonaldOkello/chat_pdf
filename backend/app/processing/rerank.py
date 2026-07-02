@@ -28,6 +28,16 @@ class CrossEncoderCache:
 
 cache = CrossEncoderCache()
 
+# Preload the cross-encoder at import time so the first query doesn't
+# pay the cold-start cost.  The model is ~100 MB and loads in <1 s on
+# modern hardware, but initialising it synchronously avoids the
+# sentence-transformers logging noise during the first request.
+try:
+    cache.get()
+    log.info("rerank model loaded: %s", RERANK_MODEL)
+except Exception:
+    log.warning("rerank model preload failed; will retry on first query")
+
 
 def passage_for_pair(h: dict[str, Any]) -> str:
     t = h.get("display_text") or h.get("text_for_embedding") or ""

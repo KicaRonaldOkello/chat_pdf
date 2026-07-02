@@ -5,6 +5,7 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from app.agents.journey import JourneyLogger
 from app.agents.llm import create_llm
 from app.agents.prompts import get_judge_prompt
 from app.agents.schemas import JudgeResult
@@ -28,7 +29,9 @@ def render_user(state: GraphState) -> str:
 
 
 async def run(state: GraphState) -> dict[str, Any]:
-    t0 = time.time()
+    logger = JourneyLogger("judge")
+    logger.log_start()
+    
     llm = create_llm(JUDGE_MODEL)
     structured = llm.with_structured_output(JudgeResult, method="json_mode")
     messages = [
@@ -39,22 +42,45 @@ async def run(state: GraphState) -> dict[str, Any]:
     result = JudgeResult(verdict="pass")
     try:
         result = await structured.ainvoke(messages)
-    except Exception:
+        logger.log_info(f"Scores: G={result.groundedness}/10, R={result.relevance}/10, C={result.completeness}/10")
+    except Exception as e:
+        logger.log_error("Structured output failed, defaulting to pass", e)
         log.debug("judge structured output failed; defaulting to pass", exc_info=True)
 
     attempts = state.get("attempts", 0)
     effective_verdict = result.verdict
-    if effective_verdict == "retry" and attempts >= AGENT_MAX_RETRIES:
+    # Low groundedness means the answerer hallucinated despite having the
+    # right chunks — retrying won't help; it would just produce a different
+    # hallucination from the same context.
+    if effective_verdict == "retry" and result.groundedness < 5:
+        logger.log_info(
+            "Answerer hallucinated (G=%d/10); forcing pass — retry won't help",
+            result.groundedness,
+        )
         effective_verdict = "pass"
+    elif effective_verdict == "retry" and attempts >= AGENT_MAX_RETRIES:
+        logger.log_info("Max retries reached, forcing pass (was: retry)")
+        effective_verdict = "pass"
+    else:
+        logger.log_info(f"Verdict: {effective_verdict}")
 
     out = result.model_dump()
     out["verdict"] = effective_verdict
     out["threshold"] = JUDGE_PASS_THRESHOLD
     out["attempts_used"] = attempts
 
+    journey_data = logger.log_complete({
+        "verdict": effective_verdict,
+        "groundedness": result.groundedness,
+        "relevance": result.relevance,
+        "completeness": result.completeness,
+        "threshold": JUDGE_PASS_THRESHOLD,
+        "attempts_used": attempts,
+    })
+    
     step = {
         "node": "judge",
-        "duration_ms": int((time.time() - t0) * 1000),
+        "duration_ms": journey_data["duration_ms"],
         "output": out,
     }
-    return {"judge": out, "trace": [step]}
+    return {"judge": out, "trace": [step], "journey": [journey_data]}

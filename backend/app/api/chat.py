@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
+import traceback
 from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any, cast
@@ -12,6 +14,8 @@ from app.agents.nodes.answerer import on_token_var
 from app.agents.state import GraphState
 from app.api.documents import readiness_error_for_documents, resolve_chat_document_ids
 from app.api.schemas import ChatRequest
+
+log = logging.getLogger(__name__)
 
 
 def nd(obj: dict[str, Any]) -> bytes:
@@ -27,6 +31,10 @@ async def chat_stream_ndjson(body: ChatRequest) -> AsyncIterator[bytes]:
 
     primary = doc_ids[0]
 
+    # Token queue is kept for the answerer to push into (avoids backpressure)
+    # but we no longer stream tokens progressively.  Instead we wait for the
+    # graph to finish and send the final answer — this prevents the user from
+    # seeing intermediate answers that the judge later retries.
     token_q: asyncio.Queue[str | None] = asyncio.Queue()
 
     async def on_token(text: str) -> None:
@@ -43,6 +51,7 @@ async def chat_stream_ndjson(body: ChatRequest) -> AsyncIterator[bytes]:
         "history": cast(Any, history),
         "attempts": 0,
         "trace": [],
+        "journey": [],
     }
 
     async def run_graph() -> dict[str, Any]:
@@ -57,20 +66,46 @@ async def chat_stream_ndjson(body: ChatRequest) -> AsyncIterator[bytes]:
 
     yield nd({"type": "stage", "name": "start", "detail": "running agent pipeline"})
 
-    while True:
-        token = await token_q.get()
-        if token is None:
-            break
-        yield nd({"type": "content", "content": token})
+    # Drain the token queue in the background so the answerer doesn't block,
+    # but don't yield content — we only send the final answer.
+    async def _drain() -> None:
+        while True:
+            t = await token_q.get()
+            if t is None:
+                return
 
+    drain_task = asyncio.create_task(_drain())
+
+    _GRAPH_TIMEOUT = 300  # seconds
     try:
-        final_state = await graph_task
-    except Exception as e:
-        yield nd({"type": "error", "message": f"Agent pipeline failed: {e}"})
+        final_state = await asyncio.wait_for(graph_task, timeout=_GRAPH_TIMEOUT)
+    except asyncio.TimeoutError:
+        log.error("graph timed out after %.0fs", _GRAPH_TIMEOUT)
+        drain_task.cancel()
+        yield nd({"type": "error", "message": "Request timed out"})
         return
+    except Exception as e:
+        log.exception("agent pipeline failed for query=%r", body.message[:100])
+        error_detail = traceback.format_exc()[-500:]
+        drain_task.cancel()
+        yield nd({
+            "type": "error",
+            "message": f"Agent pipeline failed: {type(e).__name__}: {e}",
+            "detail": error_detail,
+        })
+        return
+
+    drain_task.cancel()
 
     if final_state.get("final_route") == "reject" and final_state.get("answer"):
         yield nd({"type": "content", "content": final_state["answer"]})
+    elif final_state.get("answer"):
+        yield nd({"type": "content", "content": final_state["answer"]})
+
+    # Stream journey events (batched as requested)
+    journey_events = final_state.get("journey", [])
+    for event in journey_events:
+        yield nd({"type": "journey", **event})
 
     trace = {
         "document_id": primary,

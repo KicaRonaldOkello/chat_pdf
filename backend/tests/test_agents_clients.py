@@ -1,11 +1,10 @@
-"""HTTP helpers in app.agents.clients: JSON extraction and mocked httpx."""
+"""Tests for openrouter_json — now backed by the OpenAI SDK."""
 
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
 
 import app.agents.clients as clients_mod
@@ -17,28 +16,8 @@ async def test_openrouter_json_missing_api_key_returns_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(clients_mod, "OPENROUTER_API_KEY", "")
-    client = MagicMock()
-    client.post = AsyncMock()
 
-    out = await openrouter_json(client, model="m", system="s", user="u")
-
-    assert out is None
-    client.post.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_openrouter_json_http_4xx_returns_none_without_parsing_body(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(clients_mod, "OPENROUTER_API_KEY", "sk-test")
-    monkeypatch.setattr(clients_mod, "OPENROUTER_BASE_URL", "https://or.test/v1")
-    client = MagicMock()
-    resp = MagicMock(spec=["status_code", "text"])
-    resp.status_code = 429
-    resp.text = "rate limited"
-    client.post = AsyncMock(return_value=resp)
-
-    out = await openrouter_json(client, model="m", system="s", user="u")
+    out = await openrouter_json(model="m", system="s", user="u")
 
     assert out is None
 
@@ -49,22 +28,44 @@ async def test_openrouter_json_success_parses_choice_content(
 ) -> None:
     monkeypatch.setattr(clients_mod, "OPENROUTER_API_KEY", "sk-test")
     monkeypatch.setattr(clients_mod, "OPENROUTER_BASE_URL", "https://or.test/v1")
-    client = MagicMock()
-    resp = MagicMock()
-    resp.status_code = 200
-    resp.json.return_value = {
-        "choices": [{"message": {"content": '{"answer": 42}'}}],
-    }
-    client.post = AsyncMock(return_value=resp)
 
-    out = await openrouter_json(client, model="judge", system="s", user="u", temperature=0.1)
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = '{"answer": 42}'
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+
+    with patch("app.agents.clients.AsyncOpenAI", return_value=mock_client):
+        out = await openrouter_json(
+            model="judge", system="s", user="u", temperature=0.1
+        )
 
     assert out == {"answer": 42}
-    hdrs = client.post.call_args.kwargs["headers"]
-    assert hdrs["Authorization"] == "Bearer sk-test"
-    body = client.post.call_args.kwargs["json"]
-    assert body["temperature"] == 0.1
-    assert body["response_format"] == {"type": "json_object"}
+    call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+    assert call_kwargs["temperature"] == 0.1
+    assert call_kwargs["response_format"] == {"type": "json_object"}
+    assert call_kwargs["model"] == "judge"
+
+
+@pytest.mark.asyncio
+async def test_openrouter_json_default_reasoning_is_minimal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(clients_mod, "OPENROUTER_API_KEY", "k")
+    monkeypatch.setattr(clients_mod, "OPENROUTER_BASE_URL", "https://or.test/v1")
+
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "{}"
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+
+    with patch("app.agents.clients.AsyncOpenAI", return_value=mock_client):
+        await openrouter_json(model="m", system="s", user="u")
+
+    assert mock_client.chat.completions.create.call_args.kwargs["extra_body"] == {
+        "reasoning": {"effort": "minimal"},
+    }
 
 
 @pytest.mark.asyncio
@@ -73,22 +74,24 @@ async def test_openrouter_json_reasoning_payload_minimal(
 ) -> None:
     monkeypatch.setattr(clients_mod, "OPENROUTER_API_KEY", "k")
     monkeypatch.setattr(clients_mod, "OPENROUTER_BASE_URL", "https://or.test/v1")
-    client = MagicMock()
-    resp = MagicMock(status_code=200)
-    resp.json.return_value = {"choices": [{"message": {"content": "{}"}}]}
-    client.post = AsyncMock(return_value=resp)
 
-    await openrouter_json(
-        client,
-        model="m",
-        system="s",
-        user="u",
-        include_reasoning=True,
-        high_reasoning_effort=False,
-    )
-    assert client.post.call_args.kwargs["json"]["reasoning"] == {
-        "effort": "minimal",
-        "exclude": True,
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "{}"
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+
+    with patch("app.agents.clients.AsyncOpenAI", return_value=mock_client):
+        await openrouter_json(
+            model="m",
+            system="s",
+            user="u",
+            include_reasoning=True,
+            high_reasoning_effort=False,
+        )
+
+    assert mock_client.chat.completions.create.call_args.kwargs["extra_body"] == {
+        "reasoning": {"effort": "minimal", "exclude": True},
     }
 
 
@@ -98,37 +101,42 @@ async def test_openrouter_json_reasoning_payload_high(
 ) -> None:
     monkeypatch.setattr(clients_mod, "OPENROUTER_API_KEY", "k")
     monkeypatch.setattr(clients_mod, "OPENROUTER_BASE_URL", "https://or.test/v1")
-    client = MagicMock()
-    resp = MagicMock(status_code=200)
-    resp.json.return_value = {"choices": [{"message": {"content": "{}"}}]}
-    client.post = AsyncMock(return_value=resp)
 
-    await openrouter_json(
-        client,
-        model="m",
-        system="s",
-        user="u",
-        include_reasoning=True,
-        high_reasoning_effort=True,
-    )
-    assert client.post.call_args.kwargs["json"]["reasoning"] == {
-        "effort": "high",
-        "exclude": False,
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "{}"
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+
+    with patch("app.agents.clients.AsyncOpenAI", return_value=mock_client):
+        await openrouter_json(
+            model="m",
+            system="s",
+            user="u",
+            include_reasoning=True,
+            high_reasoning_effort=True,
+        )
+
+    assert mock_client.chat.completions.create.call_args.kwargs["extra_body"] == {
+        "reasoning": {"effort": "high", "exclude": False},
     }
 
 
 @pytest.mark.asyncio
-async def test_openrouter_json_response_json_raises_returns_none(
+async def test_openrouter_json_raises_returns_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(clients_mod, "OPENROUTER_API_KEY", "k")
     monkeypatch.setattr(clients_mod, "OPENROUTER_BASE_URL", "https://or.test/v1")
-    client = MagicMock()
-    resp = MagicMock(status_code=200)
-    resp.json.side_effect = ValueError("not valid json")
-    client.post = AsyncMock(return_value=resp)
 
-    out = await openrouter_json(client, model="m", system="s", user="u")
+    mock_client = MagicMock()
+    mock_client.chat.completions.create = AsyncMock(
+        side_effect=ValueError("boom")
+    )
+
+    with patch("app.agents.clients.AsyncOpenAI", return_value=mock_client):
+        out = await openrouter_json(model="m", system="s", user="u")
+
     assert out is None
 
 
@@ -138,10 +146,14 @@ async def test_openrouter_json_garbage_content_returns_none(
 ) -> None:
     monkeypatch.setattr(clients_mod, "OPENROUTER_API_KEY", "k")
     monkeypatch.setattr(clients_mod, "OPENROUTER_BASE_URL", "https://or.test/v1")
-    client = MagicMock()
-    resp = MagicMock(status_code=200)
-    resp.json.return_value = {"choices": [{"message": {"content": "not-json"}}]}
-    client.post = AsyncMock(return_value=resp)
 
-    out = await openrouter_json(client, model="m", system="s", user="u")
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "not-json"
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+
+    with patch("app.agents.clients.AsyncOpenAI", return_value=mock_client):
+        out = await openrouter_json(model="m", system="s", user="u")
+
     assert out is None

@@ -6,6 +6,7 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from app.agents.journey import JourneyLogger
 from app.agents.llm import create_llm
 from app.agents.prompts import get_guardrail_prompt
 from app.agents.schemas import GuardrailResult
@@ -16,6 +17,8 @@ log = logging.getLogger(__name__)
 
 
 def render_user(state: GraphState) -> str:
+    import datetime
+
     history = state.get("history") or []
     last = "\n".join(f"{m['role']}: {m['content']}" for m in history[-4:])
     doc_ids: list[str] = []
@@ -35,11 +38,19 @@ def render_user(state: GraphState) -> str:
             f"User may ask about all of them together, compare them, or ask for "
             f"common themes; that is in scope for this feature."
         )
-    return f"{scope}\n\nRecent chat history:\n{last or '(none)'}\n\nCurrent query:\n{state['query']}"
+    today = datetime.date.today().isoformat()
+    return (
+        f"Today's date: {today}\n"
+        f"{scope}\n\n"
+        f"Recent chat history:\n{last or '(none)'}\n\n"
+        f"Current query:\n{state['query']}"
+    )
 
 
 async def run(state: GraphState) -> dict[str, Any]:
-    t0 = time.time()
+    logger = JourneyLogger("guardrail")
+    logger.log_start()
+    
     llm = create_llm(GUARDRAIL_MODEL)
     structured = llm.with_structured_output(GuardrailResult, method="json_mode")
     messages = [
@@ -50,12 +61,23 @@ async def run(state: GraphState) -> dict[str, Any]:
     result = GuardrailResult(allow=True)
     try:
         result = await structured.ainvoke(messages)
-    except Exception:
+        if result.allow:
+            logger.log_info(f"Query allowed (category: {result.category or 'ok'})")
+        else:
+            logger.log_info(f"Query rejected (category: {result.category}, reason: {result.reason})")
+    except Exception as e:
+        logger.log_error("Structured output failed, defaulting to allow", e)
         log.debug("guardrail structured output failed; defaulting to allow", exc_info=True)
 
+    journey_data = logger.log_complete({
+        "allow": result.allow,
+        "category": result.category,
+        "reason": result.reason,
+    })
+    
     step = {
         "node": "guardrail",
-        "duration_ms": int((time.time() - t0) * 1000),
+        "duration_ms": journey_data["duration_ms"],
         "output": result.model_dump(),
     }
-    return {"guardrail": result.model_dump(), "trace": [step]}
+    return {"guardrail": result.model_dump(), "trace": [step], "journey": [journey_data]}

@@ -5,7 +5,22 @@ wires together middleware, lifespan, and routers.
 """
 
 import logging
+import sys
 from contextlib import asynccontextmanager
+
+# Ensure journey + agent logs are visible in the terminal.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(name)-40s  %(levelname)-8s  %(message)s",
+    stream=sys.stderr,
+)
+# Keep noisy libraries at WARNING
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("qdrant_client").setLevel(logging.WARNING)
+# Ensure agent + journey logs are visible
+logging.getLogger("app.agents").setLevel(logging.INFO)
+logging.getLogger("app.processing").setLevel(logging.INFO)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

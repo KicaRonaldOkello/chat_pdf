@@ -30,5 +30,9 @@ class GraphState(TypedDict, total=False):
     judge: dict[str, Any]
 
     attempts: int
+    retrieval_attempts: int
+    retrieval_sufficient: bool
+    gap_query: str
     trace: Annotated[list[dict[str, Any]], add]
+    journey: Annotated[list[dict[str, Any]], add]
     final_route: str

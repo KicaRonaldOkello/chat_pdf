@@ -15,7 +15,7 @@ warnings.filterwarnings(
 from langgraph.graph import END, START, StateGraph
 
 from app.agents import edges
-from app.agents.nodes import answerer, guardrail, judge, retrieve, router
+from app.agents.nodes import answerer, guardrail, judge, retrieve, retrieval_judge, router, vision
 from app.agents.state import GraphState
 from app.config import AGENT_MAX_RETRIES
 
@@ -42,6 +42,8 @@ def build_graph() -> Any:
     g.add_node("guardrail", guardrail.run)
     g.add_node("router", router.run)
     g.add_node("retrieve", retrieve.run)
+    g.add_node("retrieval_judge", retrieval_judge.run)
+    g.add_node("vision", vision.run)
     g.add_node("answerer", answerer.run)
     g.add_node("judge", judge.run)
     g.add_node("reject", reject_node)
@@ -52,7 +54,17 @@ def build_graph() -> Any:
         "guardrail", edges.after_guardrail, {"router": "router", "reject": "reject"}
     )
     g.add_edge("router", "retrieve")
-    g.add_edge("retrieve", "answerer")
+    g.add_conditional_edges(
+        "retrieve",
+        edges.after_retrieve,
+        {"vision": "vision", "retrieval_judge": "retrieval_judge"},
+    )
+    g.add_edge("vision", "retrieval_judge")
+    g.add_conditional_edges(
+        "retrieval_judge",
+        edges.after_retrieval_judge,
+        {"retrieve": "retrieve", "answerer": "answerer"},
+    )
     g.add_edge("answerer", "judge")
     g.add_conditional_edges("judge", edges.after_judge, {"router": "bump_attempts", END: END})
     g.add_edge("bump_attempts", "router")
