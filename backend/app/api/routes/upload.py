@@ -4,14 +4,23 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 
 from app import document_data
 from app.api.schemas import UploadResponse
 from app.auth.clerk_jwt import get_optional_clerk_session
-from app.config import MAX_PDF_UPLOAD_BYTES
 from app.db.repositories import UserDocumentRepository
 from app.processing.pipeline import process_document
+from app.settings import settings
 
 router = APIRouter(prefix="/api", tags=["upload"])
 
@@ -56,8 +65,8 @@ async def upload_pdf(
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Empty file")
-    if len(data) > MAX_PDF_UPLOAD_BYTES:
-        mb = MAX_PDF_UPLOAD_BYTES // (1024 * 1024)
+    if len(data) > settings.max_pdf_upload_bytes:
+        mb = settings.max_pdf_upload_bytes // (1024 * 1024)
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"PDF must be at most {mb} MB",

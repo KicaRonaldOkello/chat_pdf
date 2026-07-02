@@ -5,22 +5,23 @@ Replaces the former `app.store` filesystem under CHATPDF_DATA_DIR.
 
 from __future__ import annotations
 
-import os
 import tempfile
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from os import fdopen as _fdopen
+from os import unlink as _unlink
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.storage import get_storage
 from app.db.repositories.document_state import (
     DocumentStateRepository,
     DocumentStatus,
 )
 from app.runtime import get_db_session_maker
+from app.storage import get_storage
 
 # Re-export for call sites
 __all__ = [
@@ -162,11 +163,11 @@ def pull_source_pdf_to_tempfile(document_id: str) -> Path:
     data = get_storage().get_source_pdf_bytes(document_id)
     fd, name = tempfile.mkstemp(suffix=".pdf", prefix="chatpdf-src-")
     try:
-        with os.fdopen(fd, "wb", closefd=True) as f:
+        with _fdopen(fd, "wb", closefd=True) as f:
             f.write(data)
     except Exception:
         try:
-            os.unlink(name)
+            _unlink(name)
         except OSError:
             pass
         raise

@@ -4,13 +4,8 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from app.config import (
-    OPENROUTER_API_KEY,
-    OPENROUTER_BASE_URL,
-    SLOW_UPSTREAM_REQUEST_TIMEOUT,
-    TABLE_DESCRIBER_MODEL,
-)
 from app.processing.structure import ElementRef, Section
+from app.settings import settings
 
 DESCRIBE_PROMPT = (
     "You are writing a search-index entry for a table. Your output will be "
@@ -78,7 +73,7 @@ def _collapse_headers(lines: list[str]) -> list[str]:
     concatenates non-empty cell values per column, and replaces the whole
     header block with one clean row + one separator.
     """
-    pipe_lines = [l for l in lines if l.startswith("|")]
+    pipe_lines = [line for line in lines if line.startswith("|")]
     if len(pipe_lines) < 2:
         return lines
 
@@ -493,22 +488,22 @@ async def describe_one(
     """
     from openai import AsyncOpenAI
 
-    if not OPENROUTER_API_KEY:
+    if not settings.openrouter_api_key:
         return ""
 
     snippet = _build_describe_snippet(markdown, page_range)
     client = AsyncOpenAI(
-        base_url=OPENROUTER_BASE_URL,
-        api_key=OPENROUTER_API_KEY,
+        base_url=settings.openrouter_base_url,
+        api_key=settings.openrouter_api_key,
         default_headers={
             "HTTP-Referer": "https://localhost/chat-pdf",
             "X-Title": "chat_pdf table description",
         },
-        timeout=SLOW_UPSTREAM_REQUEST_TIMEOUT,
+        timeout=settings.slow_upstream_request_timeout,
     )
     try:
         response = await client.chat.completions.create(
-            model=TABLE_DESCRIBER_MODEL,
+            model=settings.table_describer_model,
             messages=[
                 {
                     "role": "user",
@@ -523,8 +518,8 @@ async def describe_one(
 
         logging.getLogger(__name__).warning(
             "table describe_one failed (model=%s, timeout=%.0fs)",
-            TABLE_DESCRIBER_MODEL,
-            SLOW_UPSTREAM_REQUEST_TIMEOUT,
+            settings.table_describer_model,
+            settings.slow_upstream_request_timeout,
             exc_info=True,
         )
         return ""
@@ -536,7 +531,7 @@ def count_table_rows(markdown: str) -> tuple[int, int]:
     A valid pipe table has at least a header row and a delimiter row.
     Data rows are everything below the delimiter.
     """
-    lines = [l for l in markdown.strip().splitlines() if l.startswith("|")]
+    lines = [line for line in markdown.strip().splitlines() if line.startswith("|")]
     if len(lines) < 2:
         return 0, 0
     cols = lines[0].count("|") - 1
@@ -631,7 +626,7 @@ async def enrich_tables(
             "table description: %d/%d succeeded (model=%s)",
             succeeded,
             len(to_describe),
-            TABLE_DESCRIBER_MODEL,
+            settings.table_describer_model,
         )
 
     # 4. Prune text elements that overlap detected table regions ---------------

@@ -1,17 +1,15 @@
 from __future__ import annotations
 
 import logging
-import time
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agents.journey import JourneyLogger
-from app.agents.llm import create_llm
+from app.agents.llm_factory import LLMConfig, get_llm
 from app.agents.prompts import get_guardrail_prompt
 from app.agents.schemas import GuardrailResult
 from app.agents.state import GraphState
-from app.config import GUARDRAIL_MODEL
 
 log = logging.getLogger(__name__)
 
@@ -50,8 +48,8 @@ def render_user(state: GraphState) -> str:
 async def run(state: GraphState) -> dict[str, Any]:
     logger = JourneyLogger("guardrail")
     logger.log_start()
-    
-    llm = create_llm(GUARDRAIL_MODEL)
+
+    llm = get_llm(LLMConfig.GUARDRAIL)
     structured = llm.with_structured_output(GuardrailResult, method="json_mode")
     messages = [
         SystemMessage(content=get_guardrail_prompt()),
@@ -74,7 +72,7 @@ async def run(state: GraphState) -> dict[str, Any]:
         "category": result.category,
         "reason": result.reason,
     })
-    
+
     step = {
         "node": "guardrail",
         "duration_ms": journey_data["duration_ms"],

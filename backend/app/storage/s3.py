@@ -6,13 +6,14 @@ Wraps the same boto3 logic that formerly lived in ``app.s3_storage``.
 from __future__ import annotations
 
 import logging
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
-from app.config import AWS_REGION, S3_BUCKET, S3_KEY_PREFIX
+from app.settings import settings
 from app.storage.base import StorageBackend
 
 log = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ class S3StorageBackend(StorageBackend):
         if self._client is None:
             self._client = boto3.client(
                 "s3",
-                region_name=AWS_REGION,
+                region_name=settings.aws_region,
                 config=Config(
                     signature_version="s3v4",
                     retries={"max_attempts": 3},
@@ -42,11 +43,11 @@ class S3StorageBackend(StorageBackend):
 
     @staticmethod
     def _pdf_key(doc_id: str) -> str:
-        return f"{S3_KEY_PREFIX}/{doc_id}/source.pdf"
+        return f"{settings.s3_key_prefix}/{doc_id}/source.pdf"
 
     @staticmethod
     def _image_key(doc_id: str, filename: str) -> str:
-        return f"{S3_KEY_PREFIX}/{doc_id}/images/{filename.lstrip('/')}"
+        return f"{settings.s3_key_prefix}/{doc_id}/images/{filename.lstrip('/')}"
 
     # ── PDF source files ─────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ class S3StorageBackend(StorageBackend):
         self, doc_id: str, data: bytes, content_type: str = "application/pdf"
     ) -> None:
         self._s3().put_object(
-            Bucket=S3_BUCKET,
+            Bucket=settings.s3_bucket,
             Key=self._pdf_key(doc_id),
             Body=data,
             ContentType=content_type,
@@ -63,13 +64,13 @@ class S3StorageBackend(StorageBackend):
     def get_source_pdf_bytes(self, doc_id: str) -> bytes:
         try:
             obj = self._s3().get_object(
-                Bucket=S3_BUCKET, Key=self._pdf_key(doc_id)
+                Bucket=settings.s3_bucket, Key=self._pdf_key(doc_id)
             )
         except ClientError as e:
             code = e.response.get("Error", {}).get("Code", "")
             if code in ("404", "NoSuchKey", "NotFound"):
                 raise FileNotFoundError(
-                    f"s3://{S3_BUCKET}/{self._pdf_key(doc_id)}"
+                    f"s3://{settings.s3_bucket}/{self._pdf_key(doc_id)}"
                 ) from e
             raise
         return obj["Body"].read()
@@ -78,13 +79,13 @@ class S3StorageBackend(StorageBackend):
         """Yield the PDF body in chunks from S3."""
         try:
             obj = self._s3().get_object(
-                Bucket=S3_BUCKET, Key=self._pdf_key(doc_id)
+                Bucket=settings.s3_bucket, Key=self._pdf_key(doc_id)
             )
         except ClientError as e:
             code = e.response.get("Error", {}).get("Code", "")
             if code in ("404", "NoSuchKey", "NotFound"):
                 raise FileNotFoundError(
-                    f"s3://{S3_BUCKET}/{self._pdf_key(doc_id)}"
+                    f"s3://{settings.s3_bucket}/{self._pdf_key(doc_id)}"
                 ) from e
             raise
         yield from obj["Body"].iter_chunks(chunk_size=_CHUNK_SIZE)
@@ -100,7 +101,7 @@ class S3StorageBackend(StorageBackend):
     ) -> str:
         key = self._image_key(doc_id, filename)
         self._s3().put_object(
-            Bucket=S3_BUCKET,
+            Bucket=settings.s3_bucket,
             Key=key,
             Body=data,
             ContentType=content_type,
@@ -111,12 +112,12 @@ class S3StorageBackend(StorageBackend):
 
     @staticmethod
     def _table_key(doc_id: str, table_index: int) -> str:
-        return f"{S3_KEY_PREFIX}/{doc_id}/tables/table_{table_index}.md"
+        return f"{settings.s3_key_prefix}/{doc_id}/tables/table_{table_index}.md"
 
     def put_table_markdown(self, doc_id: str, table_index: int, markdown: str) -> str:
         key = self._table_key(doc_id, table_index)
         self._s3().put_object(
-            Bucket=S3_BUCKET,
+            Bucket=settings.s3_bucket,
             Key=key,
             Body=markdown.encode("utf-8"),
             ContentType="text/markdown; charset=utf-8",
@@ -124,13 +125,13 @@ class S3StorageBackend(StorageBackend):
         return f"tables/table_{table_index}.md"
 
     def get_table_markdown(self, doc_id: str, key: str) -> str:
-        s3_key = f"{S3_KEY_PREFIX}/{doc_id}/{key}"
+        s3_key = f"{settings.s3_key_prefix}/{doc_id}/{key}"
         try:
-            obj = self._s3().get_object(Bucket=S3_BUCKET, Key=s3_key)
+            obj = self._s3().get_object(Bucket=settings.s3_bucket, Key=s3_key)
         except ClientError as e:
             code = e.response.get("Error", {}).get("Code", "")
             if code in ("404", "NoSuchKey", "NotFound"):
-                raise FileNotFoundError(f"s3://{S3_BUCKET}/{s3_key}") from e
+                raise FileNotFoundError(f"s3://{settings.s3_bucket}/{s3_key}") from e
             raise
         return obj["Body"].read().decode("utf-8")
 
@@ -138,17 +139,17 @@ class S3StorageBackend(StorageBackend):
 
     def delete_all_for_document(self, doc_id: str) -> None:
         c = self._s3()
-        prefix = f"{S3_KEY_PREFIX}/{doc_id}/"
+        prefix = f"{settings.s3_key_prefix}/{doc_id}/"
         paginator = c.get_paginator("list_objects_v2")
         batch: list[dict[str, str]] = []
-        for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=prefix):
+        for page in paginator.paginate(Bucket=settings.s3_bucket, Prefix=prefix):
             for o in page.get("Contents", []):
                 batch.append({"Key": o["Key"]})
         if not batch:
             return
         for i in range(0, len(batch), 1000):
             c.delete_objects(
-                Bucket=S3_BUCKET,
+                Bucket=settings.s3_bucket,
                 Delete={"Objects": batch[i : i + 1000]},
             )
 

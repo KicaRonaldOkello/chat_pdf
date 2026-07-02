@@ -9,7 +9,6 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from app import document_data
-from app.storage import get_storage
 from app.api.documents import search_hits_to_results
 from app.api.schemas import SearchRequest, StatusResponse, UploadedFileItem
 from app.auth.clerk_jwt import require_clerk_session
@@ -17,6 +16,7 @@ from app.db.dependencies import get_user_document_repository
 from app.db.repositories import UserDocumentRepository
 from app.processing.embeddings import embed_query
 from app.processing.vectorstore import search as vector_search
+from app.storage import get_storage
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -145,14 +145,14 @@ async def get_document_pdf_file(
 
     try:
         chunks = get_storage().get_source_pdf_streaming(doc_id)
-    except FileNotFoundError:
+    except FileNotFoundError as err:
         raise HTTPException(
             status_code=404, detail="PDF not found in storage"
-        )
-    except Exception:
+        ) from err
+    except Exception as err:
         raise HTTPException(
             status_code=502, detail="Could not read PDF from storage"
-        )
+        ) from err
 
     def stream() -> Any:
         yield from chunks

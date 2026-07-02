@@ -1,19 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import time
 from typing import Any
 
 from app import document_data
 from app.agents.journey import JourneyLogger
 from app.agents.state import GraphState
-from app.config import (
-    MAX_CONTEXT_CHARS,
-    RERANK_ENABLED,
-    RERANK_RECALL_LIMIT,
-    RETRIEVAL_TOP_K,
-)
 from app.processing import embeddings, rerank, vectorstore
+from app.settings import settings
 from app.storage import get_storage
 
 
@@ -31,11 +25,11 @@ async def display_filename(doc_id: str) -> str:
 
 
 def recall_vector_limit() -> int:
-    return RERANK_RECALL_LIMIT if RERANK_ENABLED else RETRIEVAL_TOP_K
+    return settings.rerank_recall_limit if settings.rerank_enabled else settings.retrieval_top_k
 
 
 def structural_max_chunks() -> int:
-    return min(64, RERANK_RECALL_LIMIT) if RERANK_ENABLED else 30
+    return min(64, settings.rerank_recall_limit) if settings.rerank_enabled else 30
 
 
 async def structural_paths_by_document(
@@ -214,7 +208,7 @@ async def format_context(
                         str(r["table_path"]),
                     )
                     # Only include full table if it won't blow the context budget
-                    if context_chars + len(full_md) < MAX_CONTEXT_CHARS:
+                    if context_chars + len(full_md) < settings.max_context_chars:
                         display = full_md
                     # Otherwise keep the preview (already in display_text)
                 except FileNotFoundError:
@@ -235,7 +229,7 @@ async def format_context(
         adjacent_pages -= table_pages  # don't duplicate pages we already have
 
         for adj_page in sorted(adjacent_pages):
-            if context_chars > MAX_CONTEXT_CHARS:
+            if context_chars > settings.max_context_chars:
                 break
             # Try to load a table markdown file for this adjacent page
             for did in (doc_ids or []):
@@ -264,7 +258,7 @@ async def format_context(
 async def run(state: GraphState) -> dict[str, Any]:
     logger = JourneyLogger("retrieve")
     logger.log_start()
-    
+
     plan = state.get("plan") or {}
     route = plan.get("route", "semantic")
     logger.log_info(f"Route: {route}")
@@ -292,34 +286,34 @@ async def run(state: GraphState) -> dict[str, Any]:
 
     hits = dedupe(hits)
     logger.log_info(f"After dedupe: {len(hits)} chunks")
-    
+
     doc_ids = scope_document_ids(state)
 
     rerank_info: dict[str, Any] | None
-    if RERANK_ENABLED:
-        hits = hits[:RERANK_RECALL_LIMIT]
+    if settings.rerank_enabled:
+        hits = hits[:settings.rerank_recall_limit]
         hits, rerank_info = await rerank.rerank_hits(
             state["query"],
             hits,
-            RETRIEVAL_TOP_K,
+            settings.retrieval_top_k,
             len(doc_ids),
         )
         logger.log_info(f"After rerank: {len(hits)} chunks")
     else:
-        hits = hits[:RETRIEVAL_TOP_K]
+        hits = hits[:settings.retrieval_top_k]
         rerank_info = None
         logger.log_info(f"Top-k: {len(hits)} chunks")
 
     retrieval_attempts = state.get("retrieval_attempts", 0) + 1
     context = await format_context(hits, doc_ids=doc_ids)
-    
+
     journey_data = logger.log_complete({
         "route_taken": route,
         "num_hits": len(hits),
         "retrieval_attempt": retrieval_attempts,
-        "rerank_enabled": RERANK_ENABLED,
+        "rerank_enabled": settings.rerank_enabled,
     })
-    
+
     step: dict[str, Any] = {
         "node": "retrieve",
         "duration_ms": journey_data["duration_ms"],

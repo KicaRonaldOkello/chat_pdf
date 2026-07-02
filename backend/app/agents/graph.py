@@ -15,9 +15,16 @@ warnings.filterwarnings(
 from langgraph.graph import END, START, StateGraph
 
 from app.agents import edges
-from app.agents.nodes import answerer, guardrail, judge, retrieve, retrieval_judge, router, vision
+from app.agents.nodes import (
+    answerer,
+    guardrail,
+    judge,
+    retrieval_judge,
+    retrieve,
+    router,
+    vision,
+)
 from app.agents.state import GraphState
-from app.config import AGENT_MAX_RETRIES
 
 log = logging.getLogger(__name__)
 

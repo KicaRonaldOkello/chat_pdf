@@ -14,7 +14,7 @@ import logging
 import time
 from pathlib import Path
 
-from app.config import DOCUMENTS_DIR, VISION_MODEL
+from app.settings import settings
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ _PROMPT_VERSION = "v1"
 
 
 def _cache_dir(doc_id: str) -> Path:
-    return DOCUMENTS_DIR / doc_id / _CACHE_SUBDIR
+    return settings.documents_dir / doc_id / _CACHE_SUBDIR
 
 
 def _cache_key(
@@ -36,7 +36,7 @@ def _cache_key(
     Changing the model or prompt version produces a different key so stale
     analysis is never served after a configuration change.
     """
-    model_name = (model or VISION_MODEL).strip()
+    model_name = (model or settings.vision_model).strip()
     # Use first 120 chars of the query — long enough to disambiguate,
     # short enough to avoid filesystem issues.
     prefix = query.strip()[:120].lower()

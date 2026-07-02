@@ -8,20 +8,15 @@ import re
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 import httpx
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-from app.storage import get_storage
-from app.config import (
-    OPENROUTER_API_KEY,
-    OPENROUTER_BASE_URL,
-    SLOW_UPSTREAM_REQUEST_TIMEOUT,
-    VISION_MODEL,
-)
 from app.processing.structure import ElementRef, Section
 from app.processing.tree import walk_sections
+from app.settings import settings
+from app.storage import get_storage
 
 CAPTION_PROMPT = (
     "Describe this figure from an uploaded document for a retrieval index. "
@@ -174,7 +169,7 @@ async def analyze_page_for_query(
     """
     import base64
 
-    if not OPENROUTER_API_KEY:
+    if not settings.openrouter_api_key:
         return None
 
     try:
@@ -182,12 +177,12 @@ async def analyze_page_for_query(
             render_page_image, doc_id, page, dpi=dpi
         )
     except Exception as e:
-        logger.warning(f"Failed to render page {page} for doc {doc_id}: {e}")
+        log.warning(f"Failed to render page {page} for doc {doc_id}: {e}")
         return None
 
     data_url = f"data:image/png;base64,{base64.b64encode(png_bytes).decode()}"
     payload = {
-        "model": VISION_MODEL,
+        "model": settings.vision_model,
         "messages": [
             {
                 "role": "user",
@@ -202,19 +197,19 @@ async def analyze_page_for_query(
     try:
         async with httpx.AsyncClient() as client:
             r = await client.post(
-                f"{OPENROUTER_BASE_URL}/chat/completions",
+                f"{settings.openrouter_base_url}/chat/completions",
                 json=payload,
                 headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Authorization": f"Bearer {settings.openrouter_api_key}",
                     "Content-Type": "application/json",
                 },
-                timeout=SLOW_UPSTREAM_REQUEST_TIMEOUT,
+                timeout=settings.slow_upstream_request_timeout,
             )
             r.raise_for_status()
             data = r.json()
             raw = str(data["choices"][0]["message"]["content"])
     except Exception as e:
-        logger.warning(f"Vision API call failed for doc {doc_id} page {page}: {e}")
+        log.warning(f"Vision API call failed for doc {doc_id} page {page}: {e}")
         return None
 
     # Parse the JSON response into a readable block
@@ -275,7 +270,7 @@ async def caption_one(
         return VisionCaption.empty()
 
     payload = {
-        "model": VISION_MODEL,
+        "model": settings.vision_model,
         "messages": [
             {
                 "role": "user",
@@ -289,13 +284,13 @@ async def caption_one(
     }
     try:
         r = await client.post(
-            f"{OPENROUTER_BASE_URL}/chat/completions",
+            f"{settings.openrouter_base_url}/chat/completions",
             json=payload,
             headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Authorization": f"Bearer {settings.openrouter_api_key}",
                 "Content-Type": "application/json",
             },
-            timeout=SLOW_UPSTREAM_REQUEST_TIMEOUT,
+            timeout=settings.slow_upstream_request_timeout,
         )
         r.raise_for_status()
         data = r.json()

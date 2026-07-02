@@ -1,22 +1,18 @@
 from __future__ import annotations
 
-import time
+import logging as _logging
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agents.journey import JourneyLogger
-from app.agents.llm import create_llm
+from app.agents.llm_factory import LLMConfig, get_llm
 from app.agents.prompts import get_judge_prompt
 from app.agents.schemas import JudgeResult
 from app.agents.state import GraphState
-from app.config import (
-    AGENT_MAX_RETRIES,
-    JUDGE_MODEL,
-    JUDGE_PASS_THRESHOLD,
-)
+from app.settings import settings
 
-log = __import__("logging").getLogger(__name__)
+log = _logging.getLogger(__name__)
 
 
 def render_user(state: GraphState) -> str:
@@ -31,8 +27,8 @@ def render_user(state: GraphState) -> str:
 async def run(state: GraphState) -> dict[str, Any]:
     logger = JourneyLogger("judge")
     logger.log_start()
-    
-    llm = create_llm(JUDGE_MODEL)
+
+    llm = get_llm(LLMConfig.JUDGE)
     structured = llm.with_structured_output(JudgeResult, method="json_mode")
     messages = [
         SystemMessage(content=get_judge_prompt()),
@@ -58,7 +54,7 @@ async def run(state: GraphState) -> dict[str, Any]:
             result.groundedness,
         )
         effective_verdict = "pass"
-    elif effective_verdict == "retry" and attempts >= AGENT_MAX_RETRIES:
+    elif effective_verdict == "retry" and attempts >= settings.agent_max_retries:
         logger.log_info("Max retries reached, forcing pass (was: retry)")
         effective_verdict = "pass"
     else:
@@ -66,7 +62,7 @@ async def run(state: GraphState) -> dict[str, Any]:
 
     out = result.model_dump()
     out["verdict"] = effective_verdict
-    out["threshold"] = JUDGE_PASS_THRESHOLD
+    out["threshold"] = settings.judge_pass_threshold
     out["attempts_used"] = attempts
 
     journey_data = logger.log_complete({
@@ -74,10 +70,10 @@ async def run(state: GraphState) -> dict[str, Any]:
         "groundedness": result.groundedness,
         "relevance": result.relevance,
         "completeness": result.completeness,
-        "threshold": JUDGE_PASS_THRESHOLD,
+        "threshold": settings.judge_pass_threshold,
         "attempts_used": attempts,
     })
-    
+
     step = {
         "node": "judge",
         "duration_ms": journey_data["duration_ms"],

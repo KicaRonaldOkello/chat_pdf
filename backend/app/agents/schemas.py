@@ -34,12 +34,12 @@ class RouterPlan(BaseModel):
     needs_vision: bool = False
     vision_pages: list[int] = Field(default_factory=list)
     query_variants: list[str] = Field(default_factory=list)
-    
+
     # Query interpretation fields
     query_intent: str = ""  # "summary", "comparison", "trend", "specific_data", "explanation"
     key_entities: list[str] = Field(default_factory=list)  # Entities mentioned in query
     target_sections: list[str] = Field(default_factory=list)  # Section IDs or patterns to focus on
-    
+
     # Constraint fields — accept None from LLM output
     time_range_start: str | None = None
     time_range_end: str | None = None
@@ -51,9 +51,6 @@ class RouterPlan(BaseModel):
 
     # Human-readable description of all constraints
     constraints_description: str | None = None
-    
-    # Key decisions reasoning (for streaming to frontend)
-    reasoning: str = ""
 
     model_config = {"extra": "ignore", "str_strip_whitespace": True}
 

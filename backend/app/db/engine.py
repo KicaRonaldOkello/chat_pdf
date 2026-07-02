@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from app.config import DATABASE_URL
+from app.settings import settings
 
 
 def to_async_dsn(dsn: str) -> str:
@@ -27,10 +27,10 @@ def to_async_dsn(dsn: str) -> str:
 async def open_db_engine() -> (
     tuple[AsyncEngine, async_sessionmaker[AsyncSession]] | None
 ):
-    if not DATABASE_URL:
+    if not settings.database_url:
         return None
     engine = create_async_engine(
-        to_async_dsn(DATABASE_URL), pool_size=5, max_overflow=0
+        to_async_dsn(settings.database_url), pool_size=5, max_overflow=0
     )
     sm = async_sessionmaker(
         engine,

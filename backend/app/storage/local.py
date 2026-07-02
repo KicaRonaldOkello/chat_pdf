@@ -11,10 +11,11 @@ from __future__ import annotations
 import json
 import logging
 import shutil
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
-from app.config import DOCUMENTS_DIR
+from app.settings import settings
 from app.storage.base import StorageBackend
 
 log = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ class LocalStorageBackend(StorageBackend):
     """Read/write files on the local filesystem under ``DOCUMENTS_DIR``."""
 
     def __init__(self, root: Path | None = None) -> None:
-        self._root = root or DOCUMENTS_DIR
+        self._root = root or settings.documents_dir
         self._root.mkdir(parents=True, exist_ok=True)
 
     # ── helpers ──────────────────────────────────────────────────────────

@@ -20,7 +20,9 @@ from dotenv import load_dotenv  # noqa: E402
 load_dotenv(_root / ".env", override=False)
 
 import app.db.models  # noqa: F401, E402
-from app.config import DATABASE_URL  # noqa: E402
+from app.settings import settings  # noqa: E402
+
+DATABASE_URL = settings.database_url
 from app.db.base import Base  # noqa: E402
 
 

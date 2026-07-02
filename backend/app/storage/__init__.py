@@ -25,9 +25,9 @@ def get_storage() -> StorageBackend:
     if _instance is not None:
         return _instance
 
-    from app.config import STORAGE_BACKEND
+    from app.settings import settings
 
-    backend = STORAGE_BACKEND.lower()
+    backend = settings.storage_backend.lower()
     if backend == "local":
         from app.storage.local import LocalStorageBackend
 

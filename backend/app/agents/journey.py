@@ -11,12 +11,12 @@ log = logging.getLogger(__name__)
 
 class JourneyLogger:
     """Logs journey events with timestamps for terminal and frontend streaming."""
-    
+
     def __init__(self, node_name: str):
         self.node_name = node_name
         self.start_time = datetime.now()
         self.events: list[dict[str, Any]] = []
-    
+
     def log_start(self, message: str = "") -> None:
         """Log node start with timestamp."""
         timestamp = datetime.now().isoformat()
@@ -28,7 +28,7 @@ class JourneyLogger:
         }
         self.events.append(event)
         log.info(f"[{self.node_name}] {message or 'Starting'}")
-    
+
     def log_info(self, message: str) -> None:
         """Log info message with timestamp."""
         timestamp = datetime.now().isoformat()
@@ -40,7 +40,7 @@ class JourneyLogger:
         }
         self.events.append(event)
         log.info(f"[{self.node_name}] {message}")
-    
+
     def log_debug(self, message: str) -> None:
         """Log debug message with timestamp."""
         timestamp = datetime.now().isoformat()
@@ -52,7 +52,7 @@ class JourneyLogger:
         }
         self.events.append(event)
         log.debug(f"[{self.node_name}] {message}")
-    
+
     def log_error(self, message: str, error: Exception | None = None) -> None:
         """Log error with timestamp and exception details."""
         timestamp = datetime.now().isoformat()
@@ -65,7 +65,7 @@ class JourneyLogger:
         }
         self.events.append(event)
         log.error(f"[{self.node_name}] {message}", exc_info=error is not None)
-    
+
     def log_complete(self, data: dict[str, Any] | None = None) -> dict[str, Any]:
         """Log node completion with duration and return trace data."""
         duration_ms = int((datetime.now() - self.start_time).total_seconds() * 1000)
@@ -79,7 +79,7 @@ class JourneyLogger:
         }
         self.events.append(event)
         log.info(f"[{self.node_name}] Complete ({duration_ms}ms)")
-        
+
         return {
             "node": self.node_name,
             "duration_ms": duration_ms,

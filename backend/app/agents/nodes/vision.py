@@ -15,15 +15,14 @@ are used.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from typing import Any
 
 from app.agents.state import GraphState
-from app.config import IMAGE_AUTO_VISION_SCORE
-from app.processing.images import analyze_page_for_query
 from app.processing import vision_cache
+from app.processing.images import analyze_page_for_query
+from app.settings import settings
 
 log = logging.getLogger(__name__)
 
@@ -70,7 +69,7 @@ def _collect_candidates(state: GraphState) -> list[_DocPage]:
         if hit.get("vision_analyzed", False):
             continue
         score = float(hit.get("rerank_score", hit.get("_score", 0)) or 0)
-        if score < IMAGE_AUTO_VISION_SCORE:
+        if score < settings.image_auto_vision_score:
             continue
         did = str(hit.get("document_id", ""))
         p = hit.get("page")
@@ -141,13 +140,13 @@ async def run(state: GraphState) -> dict[str, Any]:
             }
         )
 
-    pages_analyzed = sorted(set(p for _, _, p in analyses))
+    pages_analyzed = sorted({p for _, _, p in analyses})
     step = {
         "node": "vision",
         "duration_ms": int((time.time() - t0) * 1000),
         "output": {
             "pages_analyzed": pages_analyzed,
-            "documents_analyzed": sorted(set(d for d, _, _ in analyses)),
+            "documents_analyzed": sorted({d for d, _, _ in analyses}),
             "analyses": len(analyses),
         },
     }

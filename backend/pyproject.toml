@@ -27,6 +27,7 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0",
     "alembic>=1.18.4",
     "boto3>=1.35.0",
+    "pydantic-settings>=2.14.2",
 ]
 
 [tool.uv]
@@ -57,11 +58,32 @@ target-version = "py312"
 exclude = [".venv", "data"]
 
 [tool.ruff.lint]
-select = ["E", "W", "F", "I", "UP", "B", "C4", "RUF"]
-ignore = ["E501", "B008"]
+select = [
+    "E", "W", "F", "I",    # pyflakes + isort + flake8
+    "UP",                    # pyupgrade
+    "B",                     # flake8-bugbear
+    "C4",                    # flake8-comprehensions
+    "RUF",                   # ruff-specific rules
+    "SIM",                   # flake8-simplify (excl. SIM108, SIM105)
+]
+ignore = [
+    "E501",                  # line length (black handles this)
+    "B008",                  # mutable default
+    "SIM108",                # prefer ternary (style choice)
+    "SIM105",                # contextlib.suppress (style choice)
+    "PT011", "PT018",        # pytest style (not relevant)
+]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
+"app/main.py" = ["E402"]
+"app/agents/graph.py" = ["E402"]
+"app/agents/nodes/answerer.py" = ["E402"]
+"app/processing/images.py" = ["E402"]
+"app/agents/prompts.py" = ["RUF001"]  # intentional Unicode math symbols
+"app/processing/rerank.py" = ["RUF003"]  # narrow no-break spaces in comments
+"app/processing/tables.py" = ["E741", "RUF003"]  # single-char loop var + en-dash in comment
+"tests/*" = ["S101", "ARG", "PT", "F811"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]

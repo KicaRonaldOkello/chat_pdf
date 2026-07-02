@@ -5,10 +5,10 @@ from typing import Any
 
 import tiktoken
 
-from app.config import CHUNK_OVERLAP, CHUNK_TOKENS
 from app.processing.structure import ElementRef, Section
 from app.processing.tables import count_table_rows
 from app.processing.tree import walk_sections
+from app.settings import settings
 from app.storage import get_storage
 
 TABLE_ROW_THRESHOLD = 100
@@ -162,7 +162,7 @@ def chunk_section_text(
 
     bbox, page_size = union_bbox(text_els, first_page)
 
-    windows = token_split(blob, CHUNK_TOKENS, CHUNK_OVERLAP)
+    windows = token_split(blob, settings.chunk_tokens, settings.chunk_overlap)
     chunks: list[Chunk] = []
     for w in windows:
         cid = mk_id(doc_id, "text", str(next_idx))
@@ -381,7 +381,6 @@ def _find_watermark_texts(sections: list[Section]) -> set[str]:
     (e.g. \"Downloaded by John Lyomoki...\").  Embedding these 50+ times
     wastes time and pollutes retrieval.
     """
-    from collections import Counter
 
     blob_pages: dict[str, set[int]] = {}
     for sec in sections:

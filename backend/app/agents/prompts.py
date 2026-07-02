@@ -1,10 +1,4 @@
-"""Centralized system prompts for all agent nodes.
-
-Following the agentic-rag-for-dummies pattern, every prompt used by the agent
-pipeline lives in this single module as a plain function that returns a string.
-This makes prompts easy to audit, version, and test independently of the node
-logic that consumes them.
-"""
+"""System prompts for agent nodes."""
 
 from __future__ import annotations
 

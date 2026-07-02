@@ -79,7 +79,7 @@ async def chat_stream_ndjson(body: ChatRequest) -> AsyncIterator[bytes]:
     _GRAPH_TIMEOUT = 300  # seconds
     try:
         final_state = await asyncio.wait_for(graph_task, timeout=_GRAPH_TIMEOUT)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         log.error("graph timed out after %.0fs", _GRAPH_TIMEOUT)
         drain_task.cancel()
         yield nd({"type": "error", "message": "Request timed out"})
@@ -97,9 +97,7 @@ async def chat_stream_ndjson(body: ChatRequest) -> AsyncIterator[bytes]:
 
     drain_task.cancel()
 
-    if final_state.get("final_route") == "reject" and final_state.get("answer"):
-        yield nd({"type": "content", "content": final_state["answer"]})
-    elif final_state.get("answer"):
+    if (final_state.get("final_route") == "reject" and final_state.get("answer")) or final_state.get("answer"):
         yield nd({"type": "content", "content": final_state["answer"]})
 
     # Stream journey events (batched as requested)

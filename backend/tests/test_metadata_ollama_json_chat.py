@@ -14,8 +14,8 @@ import app.processing.metadata as metadata
 async def test_ollama_json_chat_success_includes_num_predict_when_capped(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(metadata, "OLLAMA_BASE_URL", "http://ollama.test")
-    monkeypatch.setattr(metadata, "METADATA_LLM_TEMPERATURE", 0.15)
+    monkeypatch.setattr("app.processing.metadata.settings.ollama_base_url", "http://ollama.test")
+    monkeypatch.setattr("app.processing.metadata.settings.metadata_llm_temperature", 0.15)
     client = MagicMock()
     resp = MagicMock()
     resp.raise_for_status = MagicMock()
@@ -42,7 +42,7 @@ async def test_ollama_json_chat_success_includes_num_predict_when_capped(
 async def test_ollama_json_chat_omits_num_predict_when_not_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(metadata, "OLLAMA_BASE_URL", "http://ollama.test")
+    monkeypatch.setattr("app.processing.metadata.settings.ollama_base_url", "http://ollama.test")
     client = MagicMock()
     resp = MagicMock()
     resp.raise_for_status = MagicMock()
@@ -59,7 +59,7 @@ async def test_ollama_json_chat_omits_num_predict_when_not_set(
 async def test_ollama_json_chat_json_decode_error_returns_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(metadata, "OLLAMA_BASE_URL", "http://ollama.test")
+    monkeypatch.setattr("app.processing.metadata.settings.ollama_base_url", "http://ollama.test")
     client = MagicMock()
     resp = MagicMock()
     resp.raise_for_status = MagicMock()
@@ -74,7 +74,7 @@ async def test_ollama_json_chat_json_decode_error_returns_none(
 async def test_ollama_json_chat_http_error_returns_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(metadata, "OLLAMA_BASE_URL", "http://ollama.test")
+    monkeypatch.setattr("app.processing.metadata.settings.ollama_base_url", "http://ollama.test")
     req = httpx.Request("POST", "http://ollama.test/api/chat")
     bad = httpx.Response(500, request=req, text="err")
     client = MagicMock()

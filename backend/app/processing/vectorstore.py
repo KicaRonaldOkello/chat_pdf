@@ -7,16 +7,10 @@ from typing import Any
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qm
 
-from app.config import (
-    EMBEDDING_DIM,
-    QDRANT_CLIENT_TIMEOUT,
-    QDRANT_COLLECTION,
-    QDRANT_POINT_NAMESPACE,
-    QDRANT_URL,
-)
 from app.processing.chunking import Chunk
+from app.settings import settings
 
-NAMESPACE = uuid.UUID(QDRANT_POINT_NAMESPACE)
+NAMESPACE = uuid.UUID(settings.qdrant_point_namespace)
 
 
 def point_id(chunk_id: str) -> str:
@@ -24,23 +18,23 @@ def point_id(chunk_id: str) -> str:
 
 
 def client() -> QdrantClient:
-    return QdrantClient(url=QDRANT_URL, timeout=QDRANT_CLIENT_TIMEOUT)
+    return QdrantClient(url=settings.qdrant_url, timeout=settings.qdrant_client_timeout)
 
 
 def ensure_collection_sync() -> None:
     c = client()
     existing = {col.name for col in c.get_collections().collections}
-    if QDRANT_COLLECTION not in existing:
+    if settings.qdrant_collection not in existing:
         c.create_collection(
-            collection_name=QDRANT_COLLECTION,
+            collection_name=settings.qdrant_collection,
             vectors_config=qm.VectorParams(
-                size=EMBEDDING_DIM, distance=qm.Distance.COSINE
+                size=settings.embedding_dim, distance=qm.Distance.COSINE
             ),
         )
     for field in ("document_id", "section_path"):
         try:
             c.create_payload_index(
-                collection_name=QDRANT_COLLECTION,
+                collection_name=settings.qdrant_collection,
                 field_name=field,
                 field_schema=qm.PayloadSchemaType.KEYWORD,
             )
@@ -60,7 +54,7 @@ def upsert_sync(chunks: list[Chunk], vectors: list[list[float]]) -> None:
         points.append(
             qm.PointStruct(id=point_id(ch.chunk_id), vector=vec, payload=ch.payload())
         )
-    client().upsert(collection_name=QDRANT_COLLECTION, points=points, wait=True)
+    client().upsert(collection_name=settings.qdrant_collection, points=points, wait=True)
 
 
 async def upsert_chunks(chunks: list[Chunk], vectors: list[list[float]]) -> None:
@@ -91,7 +85,7 @@ def search_sync(
         return []
     flt = qm.Filter(must=[document_id_match_condition(ids)])
     res = client().query_points(
-        collection_name=QDRANT_COLLECTION,
+        collection_name=settings.qdrant_collection,
         query=vector,
         query_filter=flt,
         limit=top_k,
@@ -130,7 +124,7 @@ def fetch_by_section_sync(
     while remaining > 0:
         batch_size = min(remaining, 128)
         pts, offset = client().scroll(
-            collection_name=QDRANT_COLLECTION,
+            collection_name=settings.qdrant_collection,
             scroll_filter=flt,
             limit=batch_size,
             with_payload=True,
@@ -200,7 +194,7 @@ async def fetch_by_section_multi(
 def delete_doc_sync(document_id: str) -> None:
     flt = qm.Filter(must=[document_id_match_condition([document_id])])
     client().delete(
-        collection_name=QDRANT_COLLECTION,
+        collection_name=settings.qdrant_collection,
         points_selector=qm.FilterSelector(filter=flt),
         wait=True,
     )

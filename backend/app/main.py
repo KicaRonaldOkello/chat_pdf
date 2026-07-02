@@ -28,29 +28,17 @@ from sqlalchemy import text
 
 import app.runtime as app_runtime
 from app.api.routes import auth, chat, documents, upload
-from app.config import (
-    ANSWERER_MODEL,
-    CORS_ALLOW_ORIGINS,
-    DATABASE_URL,
-    EMBEDDING_MODEL,
-    GUARDRAIL_MODEL,
-    JUDGE_MODEL,
-    METADATA_OPENROUTER_MODEL,
-    OPENROUTER_BASE_URL,
-    ROUTER_MODEL,
-    S3_BUCKET,
-    STORAGE_BACKEND,
-)
 from app.db import close_db_engine, open_db_engine
+from app.settings import settings
 
 log = logging.getLogger("app.main")
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    if STORAGE_BACKEND.lower() == "s3" and not S3_BUCKET:
+    if settings.storage_backend == "s3" and not settings.s3_bucket:
         raise RuntimeError("S3_BUCKET is empty; set S3_BUCKET in the environment when using S3 storage backend.")
-    if not (DATABASE_URL or "").strip():
+    if not settings.database_url:
         raise RuntimeError(
             "DATABASE_URL is required: document state (status, tree, meta) is stored in PostgreSQL."
         )
@@ -64,7 +52,7 @@ async def lifespan(_app: FastAPI):
     try:
         async with _app.state.db_engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-        success_msg = f"✓ Database connection successful! (Backend: {STORAGE_BACKEND})"
+        success_msg = f"✓ Database connection successful! (Backend: {settings.storage_backend})"
         log.info(success_msg)
         print(success_msg)
     except Exception as e:
@@ -84,7 +72,7 @@ app = FastAPI(title="Chat PDF API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ALLOW_ORIGINS,
+    allow_origins=settings.cors_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -106,11 +94,11 @@ async def health() -> dict[str, str]:
     return {
         "status": "ok",
         "llm_provider": "openrouter",
-        "openrouter_base_url": OPENROUTER_BASE_URL,
-        "guardrail": GUARDRAIL_MODEL,
-        "router": ROUTER_MODEL,
-        "answerer": ANSWERER_MODEL,
-        "judge": JUDGE_MODEL,
-        "metadata": METADATA_OPENROUTER_MODEL,
-        "embeddings": f"{EMBEDDING_MODEL} (ollama, local)",
+        "openrouter_base_url": settings.openrouter_base_url,
+        "guardrail": settings.guardrail_model,
+        "router": settings.router_model,
+        "answerer": settings.answerer_model,
+        "judge": settings.judge_model,
+        "metadata": settings.metadata_openrouter_model,
+        "embeddings": f"{settings.embedding_model} (ollama, local)",
     }

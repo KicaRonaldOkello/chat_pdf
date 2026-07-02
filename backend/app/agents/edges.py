@@ -10,7 +10,7 @@ from __future__ import annotations
 from langgraph.graph import END
 
 from app.agents.state import GraphState
-from app.config import AGENT_MAX_RETRIES, IMAGE_AUTO_VISION_SCORE, RETRIEVAL_MAX_RETRIES
+from app.settings import settings
 
 
 def after_guardrail(state: GraphState) -> str:
@@ -33,7 +33,7 @@ def after_retrieve(state: GraphState) -> str:
     for h in state.get("retrieved") or []:
         if h.get("type") == "image" and not h.get("vision_analyzed", False):
             score = float(h.get("rerank_score", h.get("_score", 0)) or 0)
-            if score >= IMAGE_AUTO_VISION_SCORE:
+            if score >= settings.image_auto_vision_score:
                 return "vision"
     return "retrieval_judge"
 
@@ -42,7 +42,7 @@ def after_retrieval_judge(state: GraphState) -> str:
     """Route after the retrieval judge: retry → retrieve, or continue → answerer."""
     if not state.get("retrieval_sufficient", True):
         attempts = state.get("retrieval_attempts", 0)
-        if attempts < max(1, RETRIEVAL_MAX_RETRIES):
+        if attempts < max(1, settings.retrieval_max_retries):
             return "retrieve"
     return "answerer"
 
@@ -52,6 +52,6 @@ def after_judge(state: GraphState) -> str:
     j = state.get("judge") or {}
     attempts = state.get("attempts", 0)
     verdict = j.get("verdict", "pass")
-    if verdict == "retry" and attempts < AGENT_MAX_RETRIES:
+    if verdict == "retry" and attempts < settings.agent_max_retries:
         return "router"
     return END
