@@ -50,8 +50,7 @@ async def run(state: GraphState) -> dict[str, Any]:
     # hallucination from the same context.
     if effective_verdict == "retry" and result.groundedness < 5:
         logger.log_info(
-            "Answerer hallucinated (G=%d/10); forcing pass — retry won't help",
-            result.groundedness,
+            f"Answerer hallucinated (G={result.groundedness}/10); forcing pass — retry won't help"
         )
         effective_verdict = "pass"
     elif effective_verdict == "retry" and attempts >= settings.agent_max_retries:

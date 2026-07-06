@@ -31,6 +31,8 @@ def create_llm(
         model=model,
         temperature=temperature,
         max_tokens=max_tokens,
+        timeout=kwargs.pop("request_timeout", settings.slow_upstream_request_timeout),
+        max_retries=1,
         default_headers=headers,
         **kwargs,
     )

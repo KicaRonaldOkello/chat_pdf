@@ -239,8 +239,6 @@ async def run(state: GraphState) -> dict[str, Any]:
         if plan.constraints_description:
             logger.log_info(f"Constraints: {plan.constraints_description}")
         logger.log_info(f"Route: {plan.route}, Variants: {len(plan.query_variants or [])}")
-        if plan.reasoning:
-            logger.log_debug(f"Reasoning: {plan.reasoning[:200]}")
     except Exception as e:
         logger.log_error("Structured output failed, using fallback", e)
         log.debug("router structured output failed; using fallback", exc_info=True)
@@ -270,7 +268,6 @@ async def run(state: GraphState) -> dict[str, Any]:
         "time_range": plan.time_range_description,
         "constraints": plan.constraints_description,
         "variants_count": len(plan.query_variants or []),
-        "reasoning": plan.reasoning,
     })
 
     step = {
