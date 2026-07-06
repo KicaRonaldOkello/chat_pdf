@@ -55,7 +55,7 @@ def test_upsert_sync_calls_qdrant_with_point_structs(monkeypatch: pytest.MonkeyP
     vs.upsert_sync(chunks, vectors)
     mock_q.upsert.assert_called_once()
     kwargs = mock_q.upsert.call_args.kwargs
-    assert kwargs["collection_name"] == vs.QDRANT_COLLECTION
+    assert kwargs["collection_name"] == vs.settings.qdrant_collection
     points = kwargs["points"]
     assert len(points) == 1
     assert points[0].id == vs.point_id("d::text::0")

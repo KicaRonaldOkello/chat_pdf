@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app import document_data
-from app.config import MAX_DOCS_PER_CHAT
+from app.settings import settings
 
 
 def resolve_chat_document_ids(req: Any) -> list[str]:
@@ -22,9 +22,9 @@ def resolve_chat_document_ids(req: Any) -> list[str]:
         if x not in seen:
             seen.add(x)
             out.append(x)
-    if len(out) > MAX_DOCS_PER_CHAT:
+    if len(out) > settings.max_docs_per_chat:
         raise ValueError(
-            f"At most {MAX_DOCS_PER_CHAT} documents per chat (got {len(out)})"
+            f"At most {settings.max_docs_per_chat} documents per chat (got {len(out)})"
         )
     return out
 

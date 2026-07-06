@@ -5,7 +5,7 @@ from typing import Literal
 
 import httpx
 
-from app.config import EMBEDDING_MODEL, OLLAMA_BASE_URL, SLOW_UPSTREAM_REQUEST_TIMEOUT
+from app.settings import settings
 
 BATCH = 32
 
@@ -16,7 +16,7 @@ def needs_nomic_prefix(model: str) -> bool:
 
 
 def apply_prefix(text: str, kind: Literal["query", "document"]) -> str:
-    if needs_nomic_prefix(EMBEDDING_MODEL):
+    if needs_nomic_prefix(settings.embedding_model):
         tag = "search_query" if kind == "query" else "search_document"
         return f"{tag}: {text}"
     return text
@@ -29,14 +29,14 @@ async def embed_batch(
         return []
     try:
         r = await client.post(
-            f"{OLLAMA_BASE_URL}/api/embed",
-            json={"model": EMBEDDING_MODEL, "input": inputs},
-            timeout=SLOW_UPSTREAM_REQUEST_TIMEOUT,
+            f"{settings.ollama_base_url}/api/embed",
+            json={"model": settings.embedding_model, "input": inputs},
+            timeout=settings.slow_upstream_request_timeout,
         )
     except httpx.ConnectError as e:
         raise RuntimeError(
             "Embedding service unreachable at "
-            f"{OLLAMA_BASE_URL}/api/embed. Ensure OLLAMA_BASE_URL is routable "
+            f"{settings.ollama_base_url}/api/embed. Ensure settings.ollama_base_url is routable "
             "from the API container and Ollama listens on 0.0.0.0:11434."
         ) from e
     r.raise_for_status()

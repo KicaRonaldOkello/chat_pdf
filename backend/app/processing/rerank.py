@@ -4,12 +4,7 @@ import asyncio
 import logging
 from typing import Any
 
-from app.config import (
-    RERANK_BATCH_SIZE,
-    RERANK_ENABLED,
-    RERANK_MODEL,
-    RERANK_ONLY_MULTIPLE,
-)
+from app.settings import settings
 
 log = logging.getLogger(__name__)
 
@@ -22,11 +17,21 @@ class CrossEncoderCache:
         if self.value is None:
             from sentence_transformers import CrossEncoder
 
-            self.value = CrossEncoder(RERANK_MODEL)
+            self.value = CrossEncoder(settings.rerank_model)
         return self.value
 
 
 cache = CrossEncoderCache()
+
+# Preload the cross-encoder at import time so the first query doesn't
+# pay the cold-start cost.  The model is ~100 MB and loads in <1 s on
+# modern hardware, but initialising it synchronously avoids the
+# sentence-transformers logging noise during the first request.
+try:
+    cache.get()
+    log.info("rerank model loaded: %s", settings.rerank_model)
+except Exception:
+    log.warning("rerank model preload failed; will retry on first query")
 
 
 def passage_for_pair(h: dict[str, Any]) -> str:
@@ -41,9 +46,9 @@ async def rerank_hits(
     top_k: int,
     num_docs_in_scope: int,
 ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
-    if not RERANK_ENABLED or not hits:
+    if not settings.rerank_enabled or not hits:
         return hits[:top_k], None
-    if RERANK_ONLY_MULTIPLE and num_docs_in_scope < 2:
+    if settings.rerank_only_multiple and num_docs_in_scope < 2:
         return hits[:top_k], None
     try:
         model = cache.get()
@@ -55,7 +60,7 @@ async def rerank_hits(
 
     def run_predict() -> Any:
         return model.predict(
-            pairs, batch_size=RERANK_BATCH_SIZE, show_progress_bar=False
+            pairs, batch_size=settings.rerank_batch_size, show_progress_bar=False
         )
 
     try:
@@ -74,4 +79,4 @@ async def rerank_hits(
         reverse=True,
     )
     out = [hits[i] for i in order[:top_k]]
-    return out, {"applied": True, "model": RERANK_MODEL, "candidates": len(hits)}
+    return out, {"applied": True, "model": settings.rerank_model, "candidates": len(hits)}

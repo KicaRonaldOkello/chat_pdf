@@ -1,29 +1,32 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import Any
+
+# Suppress LangGraph internal deprecation warning about JsonPlusSerializer
+# default allowed_objects — we don't use checkpointing so this is irrelevant.
+warnings.filterwarnings(
+    "ignore",
+    message="The default value of `allowed_objects` will change",
+    category=DeprecationWarning,
+)
 
 from langgraph.graph import END, START, StateGraph
 
-from app.agents.nodes import answerer, guardrail, judge, retrieve, router
+from app.agents import edges
+from app.agents.nodes import (
+    answerer,
+    guardrail,
+    judge,
+    retrieval_judge,
+    retrieve,
+    router,
+    vision,
+)
 from app.agents.state import GraphState
-from app.config import AGENT_MAX_RETRIES
 
 log = logging.getLogger(__name__)
-
-
-def after_guardrail(state: GraphState) -> str:
-    g = state.get("guardrail") or {}
-    return "router" if g.get("allow", True) else "reject"
-
-
-def after_judge(state: GraphState) -> str:
-    j = state.get("judge") or {}
-    attempts = state.get("attempts", 0)
-    verdict = j.get("verdict", "pass")
-    if verdict == "retry" and attempts < AGENT_MAX_RETRIES:
-        return "router"
-    return END
 
 
 async def reject_node(state: GraphState) -> dict[str, Any]:
@@ -46,6 +49,8 @@ def build_graph() -> Any:
     g.add_node("guardrail", guardrail.run)
     g.add_node("router", router.run)
     g.add_node("retrieve", retrieve.run)
+    g.add_node("retrieval_judge", retrieval_judge.run)
+    g.add_node("vision", vision.run)
     g.add_node("answerer", answerer.run)
     g.add_node("judge", judge.run)
     g.add_node("reject", reject_node)
@@ -53,12 +58,22 @@ def build_graph() -> Any:
 
     g.add_edge(START, "guardrail")
     g.add_conditional_edges(
-        "guardrail", after_guardrail, {"router": "router", "reject": "reject"}
+        "guardrail", edges.after_guardrail, {"router": "router", "reject": "reject"}
     )
     g.add_edge("router", "retrieve")
-    g.add_edge("retrieve", "answerer")
+    g.add_conditional_edges(
+        "retrieve",
+        edges.after_retrieve,
+        {"vision": "vision", "retrieval_judge": "retrieval_judge"},
+    )
+    g.add_edge("vision", "retrieval_judge")
+    g.add_conditional_edges(
+        "retrieval_judge",
+        edges.after_retrieval_judge,
+        {"retrieve": "retrieve", "answerer": "answerer"},
+    )
     g.add_edge("answerer", "judge")
-    g.add_conditional_edges("judge", after_judge, {"router": "bump_attempts", END: END})
+    g.add_conditional_edges("judge", edges.after_judge, {"router": "bump_attempts", END: END})
     g.add_edge("bump_attempts", "router")
     g.add_edge("reject", END)
 

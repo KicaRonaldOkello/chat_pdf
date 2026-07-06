@@ -1,97 +1,109 @@
 from __future__ import annotations
 
-import time
+import asyncio
 from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
-from typing import Any, cast
+from typing import Any
 
-from openai import AsyncOpenAI
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from app.agents.journey import JourneyLogger
+from app.agents.llm_factory import LLMConfig, get_llm
+from app.agents.prompts import get_answerer_system_prompt
 from app.agents.state import GraphState
-from app.config import (
-    ANSWERER_MODEL,
-    OPENROUTER_API_KEY,
-    OPENROUTER_BASE_URL,
-)
 
 TokenCallback = Callable[[str], Awaitable[None]]
 on_token_var: ContextVar[TokenCallback | None] = ContextVar("on_token", default=None)
 
+import logging as _logging
 
-SYSTEM_BASE = (
-    "You are a helpful assistant answering questions from PDFs the user "
-    "uploaded.  Ground every factual claim in the retrieved excerpts below.  "
-    "When the excerpts do not support an answer, say so plainly -- do not "
-    "invent content.  Cite the file name and section heading in parentheses "
-    "when it helps, e.g. (report.pdf, §1 Introduction).  "
-    "Prefer direct quotes for numbers and definitions."
-)
-
-MULTI_SUFFIX = (
-    "  Multiple documents are in scope; attribute facts to the correct file "
-    "using the '## filename — section' headers in the context."
-)
+log = _logging.getLogger(__name__)
 
 
-def build_messages(state: GraphState) -> list[dict[str, str]]:
+def _build_langchain_messages(state: GraphState) -> list:
     doc_ids = state.get("document_ids")
     if doc_ids and len(doc_ids) > 1:
         system = (
             f"The user has {len(doc_ids)} PDF(s) in this chat. Use the retrieved "
             f"excerpts from any or all of them to answer, including cross-document "
             f"comparisons and common themes. "
-        ) + SYSTEM_BASE + MULTI_SUFFIX
+        ) + get_answerer_system_prompt(multi_doc=True)
     else:
-        system = SYSTEM_BASE
+        system = get_answerer_system_prompt(multi_doc=False)
     system += (
         "\n\n--- retrieved context ---\n"
         f"{state.get('context') or '(no context retrieved)'}\n"
         "--- end context ---"
     )
-    msgs: list[dict[str, str]] = [{"role": "system", "content": system}]
+
+    msgs: list = [SystemMessage(content=system)]
     for m in state.get("history") or []:
-        msgs.append({"role": m["role"], "content": m["content"]})
-    msgs.append({"role": "user", "content": state["query"]})
+        role = m["role"]
+        if role == "assistant":
+            msgs.append(AIMessage(content=m["content"]))
+        else:
+            msgs.append(HumanMessage(content=m["content"]))
+    msgs.append(HumanMessage(content=state["query"]))
     return msgs
 
 
 async def run(state: GraphState) -> dict[str, Any]:
-    t0 = time.time()
-    on_token = on_token_var.get()
+    logger = JourneyLogger("answerer")
+    logger.log_start()
 
-    client = AsyncOpenAI(
-        base_url=OPENROUTER_BASE_URL,
-        api_key=OPENROUTER_API_KEY or "missing",
-        default_headers={
-            "HTTP-Referer": "https://localhost/chat-pdf",
-            "X-Title": "chat_pdf answerer",
-        },
-    )
+    on_token = on_token_var.get()
+    context_size = len(state.get("context", ""))
+    logger.log_info(f"Context size: {context_size} chars")
+
+    llm = get_llm(LLMConfig.ANSWERER)
+    messages = _build_langchain_messages(state)
+
     chunks: list[str] = []
+    # Total deadline for the entire streaming call — prevents hangs when
+    # the LLM provider stops sending tokens without raising an error.
+    _STREAM_DEADLINE = 120  # seconds
     try:
-        stream = await client.chat.completions.create(
-            model=ANSWERER_MODEL,
-            messages=cast(Any, build_messages(state)),
-            stream=True,
-            extra_body={"reasoning": {"effort": "minimal", "exclude": True}},
-        )
-        async for ev in cast(Any, stream):
-            choice = ev.choices[0] if ev.choices else None
-            if not choice:
-                continue
-            delta = choice.delta.content if choice.delta else None
-            if not delta:
-                continue
-            chunks.append(delta)
-            if on_token is not None:
-                await on_token(delta)
+        async with asyncio.timeout(_STREAM_DEADLINE):
+            async for chunk in llm.astream(messages):
+                raw = chunk.content if hasattr(chunk, "content") else None
+                if not raw:
+                    continue
+                # Normalise content: streaming chunks can be a str or a list of
+                # content blocks (e.g. when reasoning/thinking is enabled).
+                if isinstance(raw, list):
+                    text = "".join(
+                        block.get("text", "") if isinstance(block, dict) else str(block)
+                        for block in raw
+                    )
+                else:
+                    text = str(raw)
+                if not text:
+                    continue
+                chunks.append(text)
+                if on_token is not None:
+                    await on_token(text)
+    except TimeoutError:
+        err = "\n\n[answerer timed out after 120s]"
+        chunks.append(err)
+        logger.log_error("Streaming timed out after 120s")
+        log.warning("answerer streaming timed out after %.0fs", _STREAM_DEADLINE)
     except Exception as e:
-        chunks.append(f"\n\n[answerer error: {e}]")
+        err = f"\n\n[answerer error: {e}]"
+        chunks.append(err)
+        logger.log_error("Streaming failed", e)
+        log.warning("answerer streaming failed: %r", e)
 
     answer = "".join(chunks).strip()
+    logger.log_info(f"Generated answer: {len(answer)} chars")
+
+    journey_data = logger.log_complete({
+        "context_size": context_size,
+        "answer_length": len(answer),
+    })
+
     step = {
         "node": "answerer",
-        "duration_ms": int((time.time() - t0) * 1000),
+        "duration_ms": journey_data["duration_ms"],
         "output": {"chars": len(answer)},
     }
-    return {"answer": answer, "trace": [step]}
+    return {"answer": answer, "trace": [step], "journey": [journey_data]}

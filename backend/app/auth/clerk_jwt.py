@@ -10,9 +10,13 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
 
-from app.config import CLERK_ISSUER, CLERK_JWKS_URL, CLERK_JWT_AUDIENCE
+from app.settings import settings as _settings
 
-logger = logging.getLogger(__name__)
+CLERK_ISSUER = _settings.clerk_issuer
+CLERK_JWKS_URL = _settings.clerk_jwks_url
+CLERK_JWT_AUDIENCE = _settings.clerk_jwt_audience
+
+log = logging.getLogger(__name__)
 _bearer = HTTPBearer(auto_error=False)
 _bearer_optional = HTTPBearer(auto_error=False)
 _jwks: PyJWKClient | None = None
@@ -53,7 +57,7 @@ def build_http_exception(e: Exception) -> HTTPException:
             detail="Token expired",
         )
     if isinstance(e, (jwt.PyJWTError, ValueError)):
-        logger.debug("JWT error: %s", e, exc_info=False)
+        log.debug("JWT error: %s", e, exc_info=False)
         return HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",

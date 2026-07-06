@@ -706,6 +706,15 @@ $scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
   color: $lumen-secondary;
 }
 
+.trust__vision-icon {
+  margin-left: 0.25rem;
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  color: #7c3aed;  // purple — distinct from text/table badges
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+}
+
 .trust__jump {
   margin-left: auto;
   font-size: 16px;

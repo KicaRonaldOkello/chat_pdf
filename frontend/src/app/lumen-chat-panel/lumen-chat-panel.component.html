@@ -101,7 +101,9 @@
                                     {{ s.section_path || '(root)' }}
                                   </span>
                                   <span class="trust__page">p.{{ s.page ?? '?' }}</span>
-                                  @if (s.type && s.type !== 'text') {
+                                  @if (s.type === 'visual_analysis') {
+                                    <span class="material-symbols-outlined trust__vision-icon" matTooltip="Visual analysis rendered on demand" aria-hidden="true">psychology</span>
+                                  } @else if (s.type && s.type !== 'text') {
                                     <span class="trust__type">{{ s.type }}</span>
                                   }
                                   @if (s.page) {

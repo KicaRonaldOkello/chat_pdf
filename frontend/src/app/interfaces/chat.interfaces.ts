@@ -90,6 +90,8 @@ export interface RouterPlan {
   keywords: string[];
   rewritten_query: string;
   rationale: string;
+  needs_vision?: boolean;
+  vision_pages?: number[];
 }
 
 /** Aggregated meta surfaced to the Trust panel at end-of-stream. */

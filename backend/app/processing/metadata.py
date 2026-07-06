@@ -10,31 +10,10 @@ from typing import Any
 import httpx
 import tiktoken
 
-from app.agents.clients import openrouter_json
-from app.config import (
-    METADATA_CONCURRENCY,
-    METADATA_DOC_META_OLLAMA_TIMEOUT,
-    METADATA_DOC_META_OPENING_CHARS,
-    METADATA_LLM_TEMPERATURE,
-    METADATA_MAX_OUTPUT_TOKENS,
-    METADATA_MODEL,
-    METADATA_OLLAMA_BATCH_KEYWORDS_MAX,
-    METADATA_OLLAMA_BATCH_SECTION_SUMMARY_MAX,
-    METADATA_OLLAMA_BATCH_SIZE,
-    METADATA_OLLAMA_ENRICHMENT_TIMEOUT,
-    METADATA_OLLAMA_SECTION_BODY_TOKENS,
-    METADATA_OPENROUTER_ENRICHMENT_TEMPERATURE,
-    METADATA_OPENROUTER_ENRICHMENT_TIMEOUT,
-    METADATA_OPENROUTER_INPUT_TOKEN_BUDGET,
-    METADATA_OPENROUTER_MODEL,
-    METADATA_OPENROUTER_PARSED_KEYWORDS_MAX,
-    METADATA_OPENROUTER_PARSED_SECTION_SUMMARY_MAX,
-    METADATA_PROVIDER,
-    OLLAMA_BASE_URL,
-    OPENROUTER_API_KEY,
-)
+from app.clients import openrouter_json
 from app.processing.structure import Section
 from app.processing.tree import walk_sections
+from app.settings import settings
 
 TOKEN_ENC = tiktoken.get_encoding("cl100k_base")
 
@@ -179,14 +158,14 @@ async def ollama_json_chat(
     timeout: float = 60.0,
     max_output_tokens: int | None = None,
 ) -> Any | None:
-    options: dict[str, Any] = {"temperature": METADATA_LLM_TEMPERATURE}
+    options: dict[str, Any] = {"temperature": settings.metadata_llm_temperature}
     if max_output_tokens is not None:
         options["num_predict"] = int(max_output_tokens)
 
     content = ""
     try:
         r = await client.post(
-            f"{OLLAMA_BASE_URL}/api/chat",
+            f"{settings.ollama_base_url}/api/chat",
             json={
                 "model": model,
                 "messages": [
@@ -218,7 +197,7 @@ async def ollama_json_chat(
             "ollama json chat HTTP %s (model=%s, url=%s): %s | body: %s",
             e.response.status_code,
             model,
-            f"{OLLAMA_BASE_URL}/api/chat",
+            f"{settings.ollama_base_url}/api/chat",
             e,
             body,
         )
@@ -238,7 +217,7 @@ async def ollama_json_chat(
             model,
             type(e).__name__,
             e,
-            f"{OLLAMA_BASE_URL}/api/chat",
+            f"{settings.ollama_base_url}/api/chat",
         )
         return None
     except Exception as e:
@@ -280,7 +259,7 @@ async def enrich_batch(
     prompt_parts: list[str] = []
     for s in batch:
         body = section_body_text_limited_by_tokens(
-            s, METADATA_OLLAMA_SECTION_BODY_TOKENS
+            s, settings.metadata_ollama_section_body_tokens
         )
         bodies[s.id] = body
         if body:
@@ -292,11 +271,11 @@ async def enrich_batch(
         user = "\n".join(prompt_parts)
         parsed = await ollama_json_chat(
             client,
-            model=METADATA_MODEL,
+            model=settings.metadata_model,
             system=SECTION_SUMMARY_SYSTEM,
             user=user,
-            timeout=METADATA_OLLAMA_ENRICHMENT_TIMEOUT,
-            max_output_tokens=METADATA_MAX_OUTPUT_TOKENS,
+            timeout=settings.metadata_ollama_enrichment_timeout,
+            max_output_tokens=settings.metadata_max_output_tokens,
         )
         items: list[dict[str, Any]] = []
         if isinstance(parsed, dict):
@@ -311,11 +290,11 @@ async def enrich_batch(
             if not sid:
                 continue
             summary = str(item.get("summary", "")).strip()[
-                :METADATA_OLLAMA_BATCH_SECTION_SUMMARY_MAX
+                :settings.metadata_ollama_batch_section_summary_max
             ]
             kws_raw = item.get("keywords") or []
             keywords = [str(k).strip() for k in kws_raw if str(k).strip()][
-                :METADATA_OLLAMA_BATCH_KEYWORDS_MAX
+                :settings.metadata_ollama_batch_keywords_max
             ]
             if summary or keywords:
                 out[sid] = SectionEnrichment(summary=summary, keywords=keywords)
@@ -324,21 +303,25 @@ async def enrich_batch(
         if s.id in out:
             continue
         body = bodies[s.id]
-        out[s.id] = SectionEnrichment(
-            summary=heuristic_summary(body) if body else "",
-            keywords=heuristic_keywords(body) if body else [],
-        )
+        if body:
+            summary = heuristic_summary(body)
+            keywords = heuristic_keywords(body)
+        else:
+            # Title-only section — fall back to the title itself for keywords
+            summary = ""
+            keywords = heuristic_keywords(s.title) if s.title else []
+        out[s.id] = SectionEnrichment(summary=summary, keywords=keywords)
     return out
 
 
 async def build_sections_index(root: Section) -> list[dict[str, Any]]:
     sections = walk_sections(root)
-    size = max(1, METADATA_OLLAMA_BATCH_SIZE)
+    size = max(1, settings.metadata_ollama_batch_size)
     batches: list[list[Section]] = [
         sections[i : i + size] for i in range(0, len(sections), size)
     ]
 
-    sem = asyncio.Semaphore(max(1, METADATA_CONCURRENCY))
+    sem = asyncio.Semaphore(max(1, settings.metadata_concurrency))
 
     async with httpx.AsyncClient() as client:
 
@@ -419,7 +402,7 @@ async def build_document_meta(
     compact_sections = []
     for s in sections[:3]:
         compact_sections.append(
-            f"## {s.title}\n{section_body_text(s, METADATA_DOC_META_OPENING_CHARS)}"
+            f"## {s.title}\n{section_body_text(s, settings.metadata_doc_meta_opening_chars)}"
         )
     toc = "\n".join(
         f"- {s.path} (pp. {s.page_range[0]}-{s.page_range[1]})" for s in sections
@@ -436,10 +419,10 @@ async def build_document_meta(
     async with httpx.AsyncClient() as client:
         parsed = await ollama_json_chat(
             client,
-            model=METADATA_MODEL,
+            model=settings.metadata_model,
             system=DOC_META_SYSTEM,
             user=user,
-            timeout=METADATA_DOC_META_OLLAMA_TIMEOUT,
+            timeout=settings.metadata_doc_meta_ollama_timeout,
         )
     if isinstance(parsed, dict):
         inferred = parsed
@@ -649,10 +632,10 @@ def merge_section_response(
         if not sid:
             continue
         summary = str(item.get("summary", "")).strip()[
-            :METADATA_OPENROUTER_PARSED_SECTION_SUMMARY_MAX
+            :settings.metadata_openrouter_parsed_section_summary_max
         ]
         kws = [str(k).strip() for k in (item.get("keywords") or []) if str(k).strip()][
-            :METADATA_OPENROUTER_PARSED_KEYWORDS_MAX
+            :settings.metadata_openrouter_parsed_keywords_max
         ]
         by_id[sid] = SectionEnrichment(summary=summary, keywords=kws)
 
@@ -694,7 +677,6 @@ def merge_parsed_openrouter_index(
 
 
 async def openrouter_enrich_one_chunk(
-    client: httpx.AsyncClient,
     idx: int,
     chunk_sections: list[Section],
     *,
@@ -712,12 +694,11 @@ async def openrouter_enrich_one_chunk(
         chunk_total=chunk_total,
     )
     parsed = await openrouter_json(
-        client,
-        model=METADATA_OPENROUTER_MODEL,
+        model=settings.metadata_openrouter_model,
         system=FULL_ENRICHMENT_SYSTEM,
         user=user,
-        timeout=METADATA_OPENROUTER_ENRICHMENT_TIMEOUT,
-        temperature=METADATA_OPENROUTER_ENRICHMENT_TEMPERATURE,
+        timeout=settings.metadata_openrouter_enrichment_timeout,
+        temperature=settings.metadata_openrouter_enrichment_temperature,
     )
     return idx, parsed if isinstance(parsed, dict) else None
 
@@ -725,9 +706,9 @@ async def openrouter_enrich_one_chunk(
 async def enrich_via_openrouter(
     root: Section, *, document_id: str, filename: str, num_pages: int
 ) -> tuple[list[dict[str, Any]], dict[str, Any]] | None:
-    if not OPENROUTER_API_KEY:
+    if not settings.openrouter_api_key:
         log.warning(
-            "METADATA_PROVIDER=openrouter but OPENROUTER_API_KEY is empty; "
+            "settings.metadata_provider=openrouter but settings.openrouter_api_key is empty; "
             "falling back to Ollama batched enrichment."
         )
         return None
@@ -746,33 +727,34 @@ async def enrich_via_openrouter(
         sections,
         filename=filename,
         num_pages=num_pages,
-        token_budget=METADATA_OPENROUTER_INPUT_TOKEN_BUDGET,
+        token_budget=settings.metadata_openrouter_input_token_budget,
     )
     log.info(
         "enrichment: %d section(s) -> %d OpenRouter call(s) (budget=%d tokens)",
         len(sections),
         len(chunks),
-        METADATA_OPENROUTER_INPUT_TOKEN_BUDGET,
+        settings.metadata_openrouter_input_token_budget,
     )
 
     by_id: dict[str, SectionEnrichment] = {}
     n = len(chunks)
-    async with httpx.AsyncClient() as client:
-        results = await asyncio.gather(
-            *(
-                openrouter_enrich_one_chunk(
-                    client,
-                    i,
-                    c,
-                    all_sections=sections,
-                    filename=filename,
-                    num_pages=num_pages,
-                    chunk_total=n,
-                )
-                for i, c in enumerate(chunks)
-            ),
-            return_exceptions=True,
-        )
+    sem = asyncio.Semaphore(max(1, settings.metadata_concurrency))
+
+    async def _one_chunk(i: int, c: list[Section]) -> tuple[int, dict[str, Any] | None]:
+        async with sem:
+            return await openrouter_enrich_one_chunk(
+                i,
+                c,
+                all_sections=sections,
+                filename=filename,
+                num_pages=num_pages,
+                chunk_total=n,
+            )
+
+    results = await asyncio.gather(
+        *(_one_chunk(i, c) for i, c in enumerate(chunks)),
+        return_exceptions=True,
+    )
 
     any_chunk_parsed, parsed_by_idx = partition_openrouter_chunk_results(results, n)
     if not any_chunk_parsed:
@@ -785,10 +767,15 @@ async def enrich_via_openrouter(
         if s.id in by_id:
             continue
         body = section_body_text(s, limit_chars=1200)
-        by_id[s.id] = SectionEnrichment(
-            summary=heuristic_summary(body) if body else "",
-            keywords=heuristic_keywords(body) if body else [],
-        )
+        if body:
+            summary = heuristic_summary(body)
+            keywords = heuristic_keywords(body)
+        else:
+            # Title-only section — fall back to the title itself for keywords
+            # so the section is at least findable by name in the router.
+            summary = ""
+            keywords = heuristic_keywords(s.title) if s.title else []
+        by_id[s.id] = SectionEnrichment(summary=summary, keywords=keywords)
 
     sections_index = assemble_sections_index(sections, by_id)
     doc_meta = assemble_document_meta(
@@ -804,7 +791,7 @@ async def enrich_via_openrouter(
 async def build_enrichment(
     root: Section, *, document_id: str, filename: str, num_pages: int
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    if METADATA_PROVIDER == "openrouter":
+    if settings.metadata_provider == "openrouter":
         result = await enrich_via_openrouter(
             root,
             document_id=document_id,

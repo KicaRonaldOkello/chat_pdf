@@ -17,10 +17,10 @@ def test_needs_nomic_prefix_detects_model_name() -> None:
 
 
 def test_apply_prefix_respects_model(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(emb, "EMBEDDING_MODEL", "nomic-embed-text")
+    monkeypatch.setattr("app.processing.embeddings.settings.embedding_model", "nomic-embed-text")
     assert emb.apply_prefix("hi", "query") == "search_query: hi"
     assert emb.apply_prefix("hi", "document") == "search_document: hi"
-    monkeypatch.setattr(emb, "EMBEDDING_MODEL", "other-model")
+    monkeypatch.setattr("app.processing.embeddings.settings.embedding_model", "other-model")
     assert emb.apply_prefix("hi", "query") == "hi"
 
 
@@ -64,7 +64,7 @@ async def test_embed_batch_http_error() -> None:
 
 @pytest.mark.asyncio
 async def test_embed_texts_batches(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(emb, "EMBEDDING_MODEL", "plain-embed")
+    monkeypatch.setattr("app.processing.embeddings.settings.embedding_model", "plain-embed")
     monkeypatch.setattr(emb, "BATCH", 2)
     calls: list[list[str]] = []
 
