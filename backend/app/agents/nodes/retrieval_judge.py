@@ -159,7 +159,7 @@ async def run(state: GraphState) -> dict[str, Any]:
     missing: list[str] = []
 
     try:
-        llm = get_llm(LLMConfig.ROUTER)
+        llm = get_llm(LLMConfig.ROUTER, max_tokens=512)
         structured = llm.with_structured_output(
             type(
                 "RetrievalJudge",

@@ -28,7 +28,7 @@ async def run(state: GraphState) -> dict[str, Any]:
     logger = JourneyLogger("judge")
     logger.log_start()
 
-    llm = get_llm(LLMConfig.JUDGE)
+    llm = get_llm(LLMConfig.JUDGE, max_tokens=1024)
     structured = llm.with_structured_output(JudgeResult, method="json_mode")
     messages = [
         SystemMessage(content=get_judge_prompt()),
