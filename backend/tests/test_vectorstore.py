@@ -1,75 +1,148 @@
-"""Vector store helpers with Qdrant client mocked."""
+"""Vector store tests — mocking the Postgres session."""
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from qdrant_client.http import models as qm
 
 from app.processing import vectorstore as vs
 from app.processing.chunking import Chunk
 
 
-def test_point_id_stable_for_same_chunk() -> None:
-    a = vs.point_id("doc::text::0")
-    b = vs.point_id("doc::text::0")
-    c = vs.point_id("doc::text::1")
-    assert a == b
-    assert a != c
+def _make_chunk(**overrides) -> Chunk:
+    defaults = {
+        "chunk_id": "d::text::0",
+        "document_id": "d",
+        "element_ids": ["e1"],
+        "type": "text",
+        "section_path": "S",
+        "page": 1,
+        "text_for_embedding": "t",
+        "display_text": "t",
+    }
+    defaults.update(overrides)
+    return Chunk(**defaults)
 
 
-def test_normalize_document_ids() -> None:
-    assert vs.normalize_document_ids("d1") == ["d1"]
-    assert vs.normalize_document_ids(["a", "b"]) == ["a", "b"]
-
-
-def test_document_id_match_condition_single_vs_many() -> None:
-    one = vs.document_id_match_condition(["x"])
-    assert one.key == "document_id"
-    assert isinstance(one.match, (qm.MatchValue, qm.MatchAny))
-    many = vs.document_id_match_condition(["x", "y"])
-    assert isinstance(many.match, qm.MatchAny)
-
-
-def test_upsert_sync_skips_empty_chunks() -> None:
-    vs.upsert_sync([], [])
-
-
-def test_upsert_sync_calls_qdrant_with_point_structs(monkeypatch: pytest.MonkeyPatch) -> None:
-    mock_q = MagicMock()
-    monkeypatch.setattr(vs, "client", lambda: mock_q)
-    chunks = [
-        Chunk(
-            chunk_id="d::text::0",
-            document_id="d",
-            element_ids=["e1"],
-            type="text",
-            section_path="S",
-            page=1,
-            text_for_embedding="t",
-            display_text="t",
-        )
-    ]
-    vectors = [[0.1, 0.2, 0.3]]
-    vs.upsert_sync(chunks, vectors)
-    mock_q.upsert.assert_called_once()
-    kwargs = mock_q.upsert.call_args.kwargs
-    assert kwargs["collection_name"] == vs.settings.qdrant_collection
-    points = kwargs["points"]
-    assert len(points) == 1
-    assert points[0].id == vs.point_id("d::text::0")
-    assert points[0].vector == vectors[0]
-    assert points[0].payload["chunk_id"] == "d::text::0"
+def _mock_session() -> MagicMock:
+    session = MagicMock()
+    session.execute = AsyncMock()
+    session.commit = AsyncMock()
+    session.__aenter__ = AsyncMock(return_value=session)
+    session.__aexit__ = AsyncMock(return_value=None)
+    return session
 
 
 @pytest.mark.asyncio
-async def test_ensure_collection_delegates_to_thread(monkeypatch: pytest.MonkeyPatch) -> None:
-    called: list[bool] = []
+async def test_upsert_chunks_skips_empty() -> None:
+    await vs.upsert_chunks([], [])
 
-    def sync() -> None:
-        called.append(True)
 
-    monkeypatch.setattr(vs, "ensure_collection_sync", sync)
+@pytest.mark.asyncio
+async def test_upsert_chunks_calls_execute() -> None:
+    session = _mock_session()
+    chunks = [_make_chunk()]
+    vectors = [[0.1, 0.2, 0.3]]
+    with patch.object(vs, "_session", return_value=session):
+        await vs.upsert_chunks(chunks, vectors)
+    session.execute.assert_called()
+    session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_search_empty_ids() -> None:
+    result = await vs.search([], [0.1, 0.2], 5)
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_search_returns_hits_with_score() -> None:
+    session = _mock_session()
+    row = MagicMock()
+    row.chunk_id = "d::t::0"
+    row.document_id = "d"
+    row.element_ids = ["e1"]
+    row.type = "text"
+    row.section_path = "S"
+    row.page = 1
+    row.display_text = "hello"
+    row.bbox = None
+    row.page_size = None
+    row.extra = {}
+    row._score = 0.95
+    session.execute = AsyncMock(return_value=[row])
+
+    with patch.object(vs, "_session", return_value=session):
+        result = await vs.search("d", [0.1, 0.2], 5)
+
+    assert len(result) == 1
+    assert result[0]["_score"] == 0.95
+    assert result[0]["chunk_id"] == "d::t::0"
+
+
+@pytest.mark.asyncio
+async def test_fetch_by_section_empty_paths() -> None:
+    result = await vs.fetch_by_section("d", [])
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_fetch_by_section_returns_hits() -> None:
+    session = _mock_session()
+    row = MagicMock()
+    row.chunk_id = "d::t::0"
+    row.document_id = "d"
+    row.element_ids = []
+    row.type = "text"
+    row.section_path = "A"
+    row.page = 2
+    row.display_text = "x"
+    row.bbox = None
+    row.page_size = None
+    row.extra = None
+    session.execute = AsyncMock(return_value=[row])
+
+    with patch.object(vs, "_session", return_value=session):
+        result = await vs.fetch_by_section("d", ["A"])
+
+    assert len(result) == 1
+    assert result[0]["section_path"] == "A"
+    assert result[0]["_score"] == 1.0  # structural has fixed score
+
+
+@pytest.mark.asyncio
+async def test_delete_doc_executes_delete() -> None:
+    session = _mock_session()
+    with patch.object(vs, "_session", return_value=session):
+        await vs.delete_doc("d")
+    session.execute.assert_called_once()
+    session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_ensure_collection_is_noop() -> None:
     await vs.ensure_collection()
-    assert called == [True]
+
+
+@pytest.mark.asyncio
+async def test_fetch_by_section_multi_single_doc() -> None:
+    session = _mock_session()
+    row = MagicMock()
+    row.chunk_id = "d::t::0"
+    row.document_id = "d"
+    row.element_ids = []
+    row.type = "text"
+    row.section_path = "A"
+    row.page = 1
+    row.display_text = "x"
+    row.bbox = None
+    row.page_size = None
+    row.extra = None
+    session.execute = AsyncMock(return_value=[row])
+
+    with patch.object(vs, "_session", return_value=session):
+        result = await vs.fetch_by_section_multi({"d": ["A"]})
+
+    assert len(result) == 1
+    assert result[0]["section_path"] == "A"
