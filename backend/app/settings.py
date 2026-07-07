@@ -30,12 +30,6 @@ class Settings(BaseSettings):
     chatpdf_data_dir: Path = _BACKEND_ROOT / "data"
     documents_dir: Path = Field(default_factory=lambda: _BACKEND_ROOT / "data" / "documents")
 
-    # Qdrant
-    qdrant_url: str = "http://127.0.0.1:6333"
-    qdrant_collection: str = "doc_chunks"
-    qdrant_point_namespace: str = "b5b1f4ba-3a6a-4f4a-8b5f-1c4b9e0a0a01"
-    qdrant_client_timeout: int = 60
-
     # Embeddings
     embedding_model: str = "nomic-embed-text"
     embedding_dim: int = 768
@@ -84,6 +78,9 @@ class Settings(BaseSettings):
     # Retrieval
     retrieval_top_k: int = 8
     max_docs_per_chat: int = 12
+
+    # Vector index
+    vector_index_lists: int = 100
 
     # Reranking
     rerank_enabled: bool = True

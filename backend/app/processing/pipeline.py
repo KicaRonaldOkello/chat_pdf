@@ -139,11 +139,11 @@ async def process_document(doc_id: str) -> None:
                 ]
             )
             if chunks:
-                await vectorstore.ensure_collection()
+                await vectorstore.delete_doc(doc_id, session=session)
                 vectors = await embeddings.embed_texts(
                     [c.text_for_embedding for c in chunks]
                 )
-                await vectorstore.upsert_chunks(chunks, vectors)
+                await vectorstore.upsert_chunks(chunks, vectors, session=session)
 
             await repo.update_status(
                 doc_id, status="ready", stage="ready", progress=1.0

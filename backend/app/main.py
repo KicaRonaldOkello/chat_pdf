@@ -17,7 +17,6 @@ logging.basicConfig(
 # Keep noisy libraries at WARNING
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("openai").setLevel(logging.WARNING)
-logging.getLogger("qdrant_client").setLevel(logging.WARNING)
 # Ensure agent + journey logs are visible
 logging.getLogger("app.agents").setLevel(logging.INFO)
 logging.getLogger("app.processing").setLevel(logging.INFO)
