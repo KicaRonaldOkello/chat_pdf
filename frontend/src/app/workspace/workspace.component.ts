@@ -12,7 +12,6 @@ import {
   ViewChild
 } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { ClerkService } from 'ngx-clerk';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -35,6 +34,7 @@ import { PdfViewerComponent } from '../pdf-viewer/pdf-viewer.component';
 import { DocumentSessionService } from '../services/document-session.service';
 import { LumenNotifyService } from '../services/lumen-notify.service';
 import { MainChromeService } from '../services/main-chrome.service';
+import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-workspace',
@@ -61,7 +61,7 @@ export class WorkspaceComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly chrome = inject(MainChromeService);
   private readonly chat = inject(ChatService);
   private readonly dialog = inject(MatDialog);
-  protected readonly clerk = inject(ClerkService);
+  protected readonly authService = inject(AuthService);
   /** Prior `DocumentSessionService.onSessionChange` (e.g. app shell), restored on destroy. */
   private previousSessionChange?: () => void;
   @ViewChild('fileInput') fileInput?: ElementRef<HTMLInputElement>;
@@ -109,8 +109,7 @@ export class WorkspaceComponent implements OnInit, AfterViewInit, OnDestroy {
 
   constructor() {
     effect(() => {
-      this.clerk.isLoaded();
-      this.clerk.isSignedIn();
+      this.authService.isSignedIn();
       void this.refreshRecentDocuments();
     });
   }
@@ -142,7 +141,7 @@ export class WorkspaceComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private async refreshRecentDocuments(): Promise<void> {
-    if (!this.clerk.isLoaded() || !this.clerk.isSignedIn()) {
+    if (!this.authService.isSignedIn()) {
       this.recentDocuments = [];
       this.cdr.markForCheck();
       return;
@@ -290,7 +289,7 @@ export class WorkspaceComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   openLibraryDialog(): void {
-    if (!this.clerk.isLoaded() || !this.clerk.isSignedIn()) {
+    if (!this.authService.isSignedIn()) {
       return;
     }
     const data: LibraryPickerDialogData = {

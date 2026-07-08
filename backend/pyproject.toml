@@ -28,6 +28,7 @@ dependencies = [
     "alembic>=1.18.4",
     "boto3>=1.35.0",
     "pydantic-settings>=2.14.2",
+    "slowapi>=0.1.10",
 ]
 
 [tool.uv]

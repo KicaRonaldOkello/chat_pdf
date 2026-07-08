@@ -349,3 +349,22 @@
   color: #71717a;
   margin: 0;
 }
+
+.auth-google {
+  min-height: 3rem;
+  position: relative;
+}
+
+.auth-google__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  font-size: 0.85rem;
+  color: #5e5e5e;
+}
+
+.auth-google__btn--hidden {
+  visibility: hidden;
+  position: absolute;
+}

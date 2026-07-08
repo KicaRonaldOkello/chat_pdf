@@ -1,7 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-
-import { UserSyncService } from './services/user-sync.service';
+import { AuthService } from './services/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -10,6 +9,5 @@ import { UserSyncService } from './services/user-sync.service';
   styleUrl: './app.component.scss'
 })
 export class AppComponent {
-  // Ensures `UserSyncService` runs and syncs the Clerk user to Postgres after login.
-  private readonly _userSync = inject(UserSyncService);
+  private readonly _auth = inject(AuthService);
 }

@@ -1,3 +1,3 @@
-"""Clerk session verification and claim helpers. Persistence lives in `app.db`."""
+"""Google OAuth, session tokens, and authorization dependencies."""
 
 __all__: list[str] = []

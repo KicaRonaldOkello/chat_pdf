@@ -5,13 +5,13 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ClerkService } from 'ngx-clerk';
 
 import { UploadedFileItem } from '../interfaces';
 import { ChatService } from '../services/chat.service';
 import { DocumentSessionService } from '../services/document-session.service';
 import { MainChromeService } from '../services/main-chrome.service';
 import { formatBytesBase2OrDash } from '../util/format-bytes';
+import { AuthService } from '../services/auth.service';
 
 type SortBy = 'date' | 'size' | 'name';
 
@@ -26,7 +26,7 @@ export class LibraryComponent {
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly chat = inject(ChatService);
   protected readonly session = inject(DocumentSessionService);
-  protected readonly clerk = inject(ClerkService);
+  protected readonly authService = inject(AuthService);
 
   files: UploadedFileItem[] = [];
   sortBy: SortBy = 'date';
@@ -35,8 +35,7 @@ export class LibraryComponent {
 
   constructor() {
     effect(() => {
-      this.clerk.isLoaded();
-      this.clerk.isSignedIn();
+      this.authService.isSignedIn();
       void this.loadFiles();
     });
   }
@@ -109,7 +108,7 @@ export class LibraryComponent {
   }
 
   private async loadFiles(): Promise<void> {
-    if (!this.clerk.isLoaded() || !this.clerk.isSignedIn()) {
+    if (!this.authService.isSignedIn()) {
       this.files = [];
       this.loadError = null;
       this.loading = false;

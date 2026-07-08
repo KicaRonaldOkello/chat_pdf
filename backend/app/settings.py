@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -104,15 +104,23 @@ class Settings(BaseSettings):
     # Vision
     image_auto_vision_score: float = 0.75
 
-    # Clerk auth
-    clerk_jwks_url: str = ""
-    clerk_issuer: str = ""
-    clerk_jwt_audience: str | None = None
+    # Google & Session JWT auth
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    jwt_secret: str = ""  # REQUIRED — set in .env for all environments
+    jwt_expires_days: int = 30
 
-    # CORS
-    cors_allow_origins: list[str] = Field(
-        default_factory=lambda: ["http://localhost:4200", "http://127.0.0.1:4200"]
-    )
+    # CORS — comma-separated in env, e.g. CORS_ALLOW_ORIGINS="https://app.example.com,https://cdn.example.com"
+    cors_allow_origins: list[str] = []
+
+    @field_validator("cors_allow_origins", mode="before")
+    @classmethod
+    def _parse_cors(cls, v: object) -> list[str]:
+        if isinstance(v, str):
+            return [o.strip() for o in v.split(",") if o.strip()]
+        if isinstance(v, list):
+            return v
+        return []
 
     # Database
     database_url: str = ""
@@ -132,6 +140,11 @@ class Settings(BaseSettings):
         if not self.ollama_openai_base_url:
             self.ollama_openai_base_url = f"{self.ollama_base_url.rstrip('/')}/v1"
         self.documents_dir = Path(self.chatpdf_data_dir) / "documents"
+        if not self.cors_allow_origins:
+            self.cors_allow_origins = [
+                "http://localhost:4200",
+                "http://127.0.0.1:4200",
+            ]
 
     @classmethod
     def override(cls, **overrides) -> "Settings":

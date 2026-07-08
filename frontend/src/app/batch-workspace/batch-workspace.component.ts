@@ -26,7 +26,7 @@ import { PdfViewerComponent } from '../pdf-viewer/pdf-viewer.component';
 import { UploadedFileItem } from '../interfaces';
 import { DocumentSessionService } from '../services/document-session.service';
 import { MainChromeService } from '../services/main-chrome.service';
-import { ClerkService } from 'ngx-clerk';
+import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-batch-workspace',
@@ -48,7 +48,7 @@ export class BatchWorkspaceComponent implements OnInit, AfterViewInit, OnDestroy
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly chrome = inject(MainChromeService);
   private readonly dialog = inject(MatDialog);
-  protected readonly clerk = inject(ClerkService);
+  protected readonly authService = inject(AuthService);
   @ViewChild('splitShell') private splitShell?: ElementRef<HTMLElement>;
   @ViewChild('addFileInput') private addFileInput?: ElementRef<HTMLInputElement>;
   splitResizerDragging = false;
@@ -162,7 +162,7 @@ export class BatchWorkspaceComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   openLibraryDialog(): void {
-    if (!this.clerk.isLoaded() || !this.clerk.isSignedIn()) {
+    if (!this.authService.isSignedIn()) {
       return;
     }
     const data: LibraryPickerDialogData = {

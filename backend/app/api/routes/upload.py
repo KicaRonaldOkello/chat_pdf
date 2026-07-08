@@ -17,7 +17,7 @@ from fastapi import (
 
 from app import document_data
 from app.api.schemas import UploadResponse
-from app.auth.clerk_jwt import get_optional_clerk_session
+from app.auth.google_auth import require_session_token
 from app.db.repositories import UserDocumentRepository
 from app.processing.pipeline import process_document
 from app.settings import settings
@@ -58,7 +58,7 @@ async def upload_pdf(
     request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    claims: dict[str, Any] | None = Depends(get_optional_clerk_session),
+    claims: dict[str, Any] = Depends(require_session_token),
 ) -> UploadResponse:
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Expected a PDF file")

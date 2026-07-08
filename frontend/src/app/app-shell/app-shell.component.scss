@@ -196,6 +196,68 @@ $scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
   height: 6px;
 }
 
+/* ---- Sidebar user ---- */
+.lumen-sidebar__user {
+  margin-top: auto;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid rgba($lumen-outline-variant, 0.25);
+}
+
+.lumen-sidebar__user-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: $lumen-on-surface;
+  font-family: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  border-radius: 0.5rem;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: rgba($lumen-outline-variant, 0.15);
+  }
+
+  &--collapsed {
+    justify-content: center;
+    padding: 0.5rem;
+  }
+}
+
+.lumen-sidebar__user-avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.lumen-sidebar__user-avatar--placeholder {
+  font-size: 2rem;
+  color: $lumen-secondary;
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+}
+
+.lumen-sidebar__user-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  font-weight: 500;
+}
+
+.lumen-sidebar__user-arrow {
+  font-size: 1rem !important;
+}
+
 /* ---- Main ---- */
 .main.lumen-main {
   flex: 1 1 auto;
@@ -242,5 +304,55 @@ $scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
   font: inherit;
   color: inherit;
   text-align: left;
+}
+
+/* ---- Sidebar user dropdown (Material Menu overrides) ---- */
+::ng-deep .lumen-user-menu-panel {
+  margin-top: 0.5rem !important;
+  margin-left: 0.5rem !important;
+
+  .mat-mdc-menu-content {
+    padding: 0.375rem !important;
+    min-width: 11rem;
+  }
+
+  .mat-mdc-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.625rem 0.875rem !important;
+    min-height: 2.25rem !important;
+    font-family: Inter, system-ui, sans-serif !important;
+    font-size: 0.8125rem !important;
+    font-weight: 500 !important;
+    line-height: 1.4 !important;
+    color: $lumen-on-surface !important;
+    border-radius: 0.375rem;
+    margin: 0.125rem 0.25rem;
+    transition: background 0.15s ease;
+
+    .material-symbols-outlined {
+      font-size: 1.125rem;
+      color: $lumen-secondary;
+    }
+
+    &:hover {
+      background: rgba($lumen-outline-variant, 0.15) !important;
+    }
+
+    &:active {
+      background: rgba($lumen-outline-variant, 0.25) !important;
+    }
+  }
+}
+
+::ng-deep .cdk-overlay-pane:has(.lumen-user-menu-panel) {
+  .mat-mdc-menu-panel {
+    background: $lumen-surface-lowest;
+    border: 1px solid rgba($lumen-outline-variant, 0.3);
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 24px -4px rgba(26, 28, 28, 0.08);
+    min-width: 11rem;
+  }
 }
 

@@ -46,8 +46,11 @@
           <h2 class="auth-panel__title">Welcome back</h2>
         </div>
 
-        <div class="auth-clerk">
-          <clerk-sign-in [props]="signInProps" />
+        <div class="auth-google">
+          @if (!googleLoaded()) {
+            <div class="auth-google__loading">Loading sign-in…</div>
+          }
+          <div id="google-login-btn" [class.auth-google__btn--hidden]="!googleLoaded()"></div>
         </div>
 
         <div class="auth-panel__margin-note">

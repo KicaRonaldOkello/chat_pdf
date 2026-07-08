@@ -3,12 +3,11 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "clerk:env": "node ./scripts/clerk-env.mjs",
-    "postinstall": "node ./scripts/clerk-env.mjs",
-    "prestart": "node ./scripts/clerk-env.mjs",
-    "prebuild": "node ./scripts/clerk-env.mjs",
     "start": "ng serve",
     "build": "ng build",
+    "build:dev": "ng build --configuration development",
+    "build:staging": "ng build --configuration staging",
+    "build:prod": "ng build --configuration production",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },
@@ -26,7 +25,6 @@
     "@angular/router": "^19.2.0",
     "dompurify": "^3.4.0",
     "marked": "^18.0.2",
-    "ngx-clerk": "^1.0.0-canary.ea6b329",
     "pdfjs-dist": "^4.10.38",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
