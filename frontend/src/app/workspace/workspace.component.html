@@ -48,7 +48,7 @@
             From this device
           </span>
         </button>
-        @if (clerk.isSignedIn()) {
+        @if (authService.isSignedIn()) {
           <button mat-menu-item type="button" (click)="openLibraryDialog()">
             <span class="add-pdf-source-menu__row">
               <span class="material-symbols-outlined" aria-hidden="true">library_books</span>
@@ -187,7 +187,7 @@
               </li>
             } @empty {
               <li class="lumen-recent__empty" role="status">
-                @if (clerk.isLoaded() && !clerk.isSignedIn()) {
+                @if (authService.isLoaded() && !authService.isSignedIn()) {
                   <span>Sign in to see your last uploads here.</span>
                 } @else {
                   <span>

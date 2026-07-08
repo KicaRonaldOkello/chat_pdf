@@ -7,6 +7,7 @@ import { BatchWorkspaceComponent } from './batch-workspace/batch-workspace.compo
 import { LandingComponent } from './landing/landing.component';
 import { LibraryComponent } from './library/library.component';
 import { WorkspaceComponent } from './workspace/workspace.component';
+import { authGuard } from './services/auth.guard';
 
 export const routes: Routes = [
   { path: '', component: LandingComponent },
@@ -14,6 +15,7 @@ export const routes: Routes = [
   {
     path: 'app',
     component: AppShellComponent,
+    canActivate: [authGuard],
     children: [
       { path: '', pathMatch: 'full', component: WorkspaceComponent },
       { path: 'batch', component: BatchUploadComponent },

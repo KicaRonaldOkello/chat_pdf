@@ -10,16 +10,16 @@ from app.db.base import Base
 
 
 class UserDocument(Base):
-    """One row per upload (recents / library), scoped to a Clerk user; links to `document_id`."""
+    """One row per upload (recents / library), scoped to a user; links to `document_id`."""
 
     __tablename__ = "user_documents"
-    __table_args__ = (Index("ix_user_documents_clerk_user_uploaded", "clerk_user_id", "uploaded_at"),)
+    __table_args__ = (Index("ix_user_documents_user_uploaded", "user_id", "uploaded_at"),)
 
     id: Mapped[int] = mapped_column(
         BigInteger, primary_key=True, autoincrement=True
     )
-    clerk_user_id: Mapped[str] = mapped_column(
-        String, ForeignKey("users.clerk_user_id", ondelete="CASCADE"), nullable=False
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
     )
     document_id: Mapped[str] = mapped_column(
         String(64), unique=True, nullable=False

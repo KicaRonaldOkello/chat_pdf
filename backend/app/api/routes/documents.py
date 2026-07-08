@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from app import document_data
 from app.api.documents import search_hits_to_results
 from app.api.schemas import SearchRequest, StatusResponse, UploadedFileItem
-from app.auth.clerk_jwt import require_clerk_session
+from app.auth.google_auth import require_session_token
 from app.db.dependencies import get_user_document_repository
 from app.db.repositories import UserDocumentRepository
 from app.processing.embeddings import embed_query
@@ -68,10 +68,10 @@ class RecentDocumentItem(BaseModel):
 @router.get("/recent", response_model=list[RecentDocumentItem])
 async def list_recent_documents(
     user_doc_repo: UserDocumentRepository = Depends(get_user_document_repository),
-    claims: dict[str, Any] = Depends(require_clerk_session),
+    claims: dict[str, Any] = Depends(require_session_token),
     limit: int = Query(3, ge=1, le=50),
 ) -> list[RecentDocumentItem]:
-    """Last uploaded PDFs for the signed-in Clerk user (for Home recents)."""
+    """Last uploaded PDFs for the signed-in user (for Home recents)."""
     sub = claims.get("sub")
     if not isinstance(sub, str):
         raise HTTPException(
@@ -93,7 +93,7 @@ async def list_recent_documents(
 @router.get("/uploaded", response_model=list[UploadedFileItem])
 async def list_uploaded_files(
     user_doc_repo: UserDocumentRepository = Depends(get_user_document_repository),
-    claims: dict[str, Any] = Depends(require_clerk_session),
+    claims: dict[str, Any] = Depends(require_session_token),
     limit: int = Query(200, ge=1, le=500),
 ) -> list[UploadedFileItem]:
     """All PDFs recorded for the signed-in user (newest first; processing status from Postgres)."""
@@ -124,7 +124,7 @@ async def list_uploaded_files(
 async def get_document_pdf_file(
     doc_id: str,
     user_doc_repo: UserDocumentRepository = Depends(get_user_document_repository),
-    claims: dict[str, Any] = Depends(require_clerk_session),
+    claims: dict[str, Any] = Depends(require_session_token),
 ) -> StreamingResponse:
     """Stream the PDF for a document the user owns from storage."""
     sub = claims.get("sub")

@@ -1,9 +1,8 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { ClerkService } from 'ngx-clerk';
 import { Observable, from, map, switchMap } from 'rxjs';
 
-import { API_BASE } from '../constants/const';
+import { environment } from '../../environments/environment';
 import {
   ChatMessage,
   ChatStreamHandlers,
@@ -16,19 +15,16 @@ import {
   RouterPlan,
   UploadResult
 } from '../interfaces';
+import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
 export class ChatService {
   private readonly http = inject(HttpClient);
-  private readonly clerk = inject(ClerkService);
-  private readonly base = API_BASE;
+  private readonly authService = inject(AuthService);
+  private readonly base = environment.apiBaseUrl + '/api';
 
-  private async buildBearerHeaders(): Promise<HttpHeaders> {
-    const s = this.clerk.session();
-    if (!s) {
-      return new HttpHeaders();
-    }
-    const token = await s.getToken();
+  private buildBearerHeaders(): HttpHeaders {
+    const token = this.authService.getSessionToken();
     return token
       ? new HttpHeaders({ Authorization: `Bearer ${token}` })
       : new HttpHeaders();
@@ -37,34 +33,25 @@ export class ChatService {
   uploadPdf(file: File): Observable<UploadResult> {
     const fd = new FormData();
     fd.append('file', file, file.name);
-    return from(this.buildBearerHeaders()).pipe(
-      switchMap((headers) =>
-        this.http.post<UploadResult>(`${this.base}/upload`, fd, { headers })
-      )
-    );
+    const headers = this.buildBearerHeaders();
+    return this.http.post<UploadResult>(`${this.base}/upload`, fd, { headers });
   }
 
   getRecentDocuments(limit = 3): Observable<RecentDocumentItem[]> {
-    return from(this.buildBearerHeaders()).pipe(
-      switchMap((headers) =>
-        this.http.get<RecentDocumentItem[]>(`${this.base}/documents/recent`, {
-          headers,
-          params: { limit: String(limit) }
-        })
-      )
-    );
+    const headers = this.buildBearerHeaders();
+    return this.http.get<RecentDocumentItem[]>(`${this.base}/documents/recent`, {
+      headers,
+      params: { limit: String(limit) }
+    });
   }
 
   /** Newest first from API; use `limit` to cap (default 200). */
   getUploadedFiles(limit = 200): Observable<UploadedFileItem[]> {
-    return from(this.buildBearerHeaders()).pipe(
-      switchMap((headers) =>
-        this.http.get<UploadedFileItem[]>(`${this.base}/documents/uploaded`, {
-          headers,
-          params: { limit: String(limit) }
-        })
-      )
-    );
+    const headers = this.buildBearerHeaders();
+    return this.http.get<UploadedFileItem[]>(`${this.base}/documents/uploaded`, {
+      headers,
+      params: { limit: String(limit) }
+    });
   }
 
   getStatus(documentId: string): Observable<DocumentStatus> {
@@ -73,14 +60,11 @@ export class ChatService {
 
   /** Authenticated PDF bytes (owner must match DB). */
   getDocumentFileBlob(documentId: string): Observable<Blob> {
-    return from(this.buildBearerHeaders()).pipe(
-      switchMap((headers) =>
-        this.http.get(`${this.base}/documents/${documentId}/file`, {
-          headers,
-          responseType: 'blob'
-        })
-      )
-    );
+    const headers = this.buildBearerHeaders();
+    return this.http.get(`${this.base}/documents/${documentId}/file`, {
+      headers,
+      responseType: 'blob'
+    });
   }
 
   searchDocument(
@@ -116,12 +100,18 @@ export class ChatService {
       body['document_ids'] = documentIds;
     }
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'application/x-ndjson'
+    };
+    const token = this.authService.getSessionToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const res = await fetch(`${this.base}/chat/stream`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/x-ndjson'
-      },
+      headers,
       body: JSON.stringify(body)
     });
 

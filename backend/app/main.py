@@ -69,6 +69,8 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="Chat PDF API", lifespan=lifespan)
 
+# ── security middleware ───────────────────────────────────────────────────────
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_allow_origins,
@@ -76,6 +78,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Rate limiting (in-memory, per-IP)
+from slowapi import _rate_limit_exceeded_handler as _rl_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
+
+app.state.limiter_key_func = get_remote_address
+app.add_middleware(SlowAPIMiddleware)
+app.add_exception_handler(RateLimitExceeded, _rl_handler)
+
+
+@app.middleware("http")
+async def _add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["Strict-Transport-Security"] = (
+        "max-age=63072000; includeSubDomains; preload"
+    )
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' https://accounts.google.com; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; "
+        "font-src 'self'; "
+        "connect-src 'self' https://openrouter.ai"
+    )
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 # ── domain routers ───────────────────────────────────────────────────────────
 

@@ -1,8 +1,5 @@
-import { clerkPublishableKey } from './environment.autogen';
-// `environment.autogen.ts` is gitignored and created by `npm run clerk:env` (also postinstall, prestart, prebuild).
-
 export const environment = {
   production: false,
-  /** Clerk publishable key (from `.env` via `scripts/clerk-env.mjs` before serve/build). */
-  clerkPublishableKey
+  apiBaseUrl: '',   // proxied by Angular dev server (proxy.conf.json)
+  googleClientId: '1031277105302-3vu2a6erje851oqp0duchqr6gqpdtmgg.apps.googleusercontent.com',
 };

@@ -12,12 +12,12 @@
 </header>
 <div class="main__body lumen-lib">
   <div class="lumen-lib__inner">
-    @if (!clerk.isLoaded() || loading) {
+    @if (!authService.isLoaded() || loading) {
       <div class="lumen-lib__state lumen-lib__state--spinner" role="status" aria-live="polite">
         <mat-spinner diameter="32" />
         <span class="lumen-lib__state-text">Loading…</span>
       </div>
-    } @else if (clerk.isLoaded() && !clerk.isSignedIn()) {
+    } @else if (authService.isLoaded() && !authService.isSignedIn()) {
       <p class="lumen-lib__state">Sign in to see the PDFs you have uploaded.</p>
     } @else if (loadError) {
       <p class="lumen-lib__state lumen-lib__state--error" role="alert">{{ loadError }}</p>

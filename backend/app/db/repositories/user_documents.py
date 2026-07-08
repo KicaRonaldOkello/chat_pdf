@@ -25,21 +25,21 @@ class UserDocumentRepository:
 
     async def record_upload(
         self,
-        clerk_user_id: str,
+        user_id: str,
         document_id: str,
         filename: str,
         file_size_bytes: int,
     ) -> None:
         self._session.add(
             UserDocument(
-                clerk_user_id=clerk_user_id,
+                user_id=user_id,
                 document_id=document_id,
                 filename=filename,
                 file_size_bytes=file_size_bytes,
             )
         )
 
-    async def list_for_user(self, clerk_user_id: str, limit: int) -> list[UserDocumentRow]:
+    async def list_for_user(self, user_id: str, limit: int) -> list[UserDocumentRow]:
         stmt = (
             select(
                 UserDocument.document_id,
@@ -47,7 +47,7 @@ class UserDocumentRepository:
                 UserDocument.file_size_bytes,
                 UserDocument.uploaded_at,
             )
-            .where(UserDocument.clerk_user_id == clerk_user_id)
+            .where(UserDocument.user_id == user_id)
             .order_by(desc(UserDocument.uploaded_at))
             .limit(limit)
         )
@@ -60,19 +60,19 @@ class UserDocumentRepository:
             for r in rows
         ]
 
-    async def list_recent(self, clerk_user_id: str, limit: int = 3) -> list[UserDocumentRow]:
-        return await self.list_for_user(clerk_user_id, limit)
+    async def list_recent(self, user_id: str, limit: int = 3) -> list[UserDocumentRow]:
+        return await self.list_for_user(user_id, limit)
 
     async def delete_by_document_id(self, document_id: str) -> None:
         await self._session.execute(
             delete(UserDocument).where(UserDocument.document_id == document_id)
         )
 
-    async def is_owner(self, clerk_user_id: str, document_id: str) -> bool:
+    async def is_owner(self, user_id: str, document_id: str) -> bool:
         stmt = (
             select(UserDocument.document_id)
             .where(
-                UserDocument.clerk_user_id == clerk_user_id,
+                UserDocument.user_id == user_id,
                 UserDocument.document_id == document_id,
             )
             .limit(1)

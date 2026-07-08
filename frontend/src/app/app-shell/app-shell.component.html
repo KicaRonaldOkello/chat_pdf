@@ -70,14 +70,45 @@
         </div>
       }
     </div>
+
+    @if (authService.isSignedIn()) {
+      <div class="lumen-sidebar__user">
+        @if (!sidebarCollapsed) {
+          <button mat-button [matMenuTriggerFor]="userMenu" class="lumen-sidebar__user-btn">
+            @if (authService.currentUser()?.picture) {
+              <img [src]="authService.currentUser()?.picture" class="lumen-sidebar__user-avatar" alt="" referrerpolicy="no-referrer" />
+            } @else {
+              <span class="material-symbols-outlined lumen-sidebar__user-avatar--placeholder">account_circle</span>
+            }
+            <span class="lumen-sidebar__user-name">{{ authService.currentUser()?.name || authService.currentUser()?.email }}</span>
+            <span class="material-symbols-outlined lumen-sidebar__user-arrow">expand_less</span>
+          </button>
+        } @else {
+          <button
+            mat-button
+            [matMenuTriggerFor]="userMenu"
+            class="lumen-sidebar__user-btn lumen-sidebar__user-btn--collapsed"
+            [matTooltip]="(authService.currentUser()?.name || authService.currentUser()?.email) ?? 'Account'"
+            matTooltipPosition="right"
+          >
+            @if (authService.currentUser()?.picture) {
+              <img [src]="authService.currentUser()?.picture" class="lumen-sidebar__user-avatar" alt="" referrerpolicy="no-referrer" />
+            } @else {
+              <span class="material-symbols-outlined">account_circle</span>
+            }
+          </button>
+        }
+        <mat-menu #userMenu="matMenu" class="lumen-user-menu-panel">
+          <button mat-menu-item (click)="authService.signOut()">
+            <span class="material-symbols-outlined">logout</span>
+            <span>Sign Out</span>
+          </button>
+        </mat-menu>
+      </div>
+    }
   </aside>
 
   <div class="main lumen-main">
-    @if (clerk.isLoaded() && clerk.isSignedIn()) {
-      <div class="lumen-main__top" role="banner" aria-label="Account">
-        <clerk-user-button />
-      </div>
-    }
     <router-outlet />
   </div>
 </div>
