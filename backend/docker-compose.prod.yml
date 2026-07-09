@@ -19,8 +19,7 @@ services:
     image: ghcr.io/${GHCR_OWNER:-you}/chat-pdf-backend:latest
     container_name: chat_pdf_api
     restart: unless-stopped
-    ports:
-      - "${API_PORT:-8055}:8000"
+    network_mode: host
     env_file:
       - .env
     healthcheck:
