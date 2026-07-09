@@ -19,6 +19,29 @@ class ElementRef:
     page_size: list[float] | None = None  # [width, height] of that coord system
     extra: dict[str, Any] = field(default_factory=dict)
 
+    @staticmethod
+    def from_dict(data: dict[str, Any]) -> ElementRef:
+        """Deserialize an ElementRef from its ``to_dict`` representation."""
+        _KNOWN = {"id", "type", "page", "text", "bbox", "page_size"}
+        extra = {k: v for k, v in data.items() if k not in _KNOWN}
+        return ElementRef(
+            id=str(data["id"]),
+            type=str(data["type"]),
+            page=int(data.get("page", 1)),
+            text=str(data.get("text", "")),
+            bbox=(
+                [float(x) for x in data["bbox"]]
+                if "bbox" in data and data["bbox"] is not None
+                else None
+            ),
+            page_size=(
+                [float(x) for x in data["page_size"]]
+                if "page_size" in data and data["page_size"] is not None
+                else None
+            ),
+            extra=extra,
+        )
+
 
 @dataclass
 class Section:
@@ -51,6 +74,23 @@ class Section:
             ],
             "children": [c.to_dict() for c in self.children],
         }
+
+    @staticmethod
+    def from_dict(data: dict[str, Any]) -> Section:
+        """Deserialize a Section from its ``to_dict`` representation."""
+        return Section(
+            id=str(data["id"]),
+            title=str(data["title"]),
+            level=int(data["level"]),
+            path=str(data["path"]),
+            page_range=[int(p) for p in data["page_range"]],
+            elements=[
+                ElementRef.from_dict(e) for e in data.get("elements", [])
+            ],
+            children=[
+                Section.from_dict(c) for c in data.get("children", [])
+            ],
+        )
 
 
 def el_category(el: Any) -> str:

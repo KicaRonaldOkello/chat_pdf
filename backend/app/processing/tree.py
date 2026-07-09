@@ -22,6 +22,24 @@ def serialize(
     }
 
 
+def deserialize(tree_data: dict[str, Any]) -> Section:
+    """Reconstruct a Section tree from a ``serialize()``-produced dict.
+
+    Returns a synthetic root whose children are the stored top-level sections,
+    matching the shape expected by ``walk_sections`` (which skips the root).
+    """
+    section_dicts: list[dict[str, Any]] = tree_data.get("sections", [])
+    root = Section(
+        id="sec-root",
+        title="(root)",
+        level=0,
+        path="",
+        page_range=[1, 1],
+    )
+    root.children = [Section.from_dict(s) for s in section_dicts]
+    return root
+
+
 def walk_sections(root: Section) -> list[Section]:
     out: list[Section] = []
     stack: list[Section] = [root]

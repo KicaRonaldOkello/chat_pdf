@@ -38,10 +38,15 @@ def get_storage() -> StorageBackend:
 
         _instance = S3StorageBackend()
         log.info("storage backend: S3")
+    elif backend == "azure":
+        from app.storage.azure import AzureStorageBackend
+
+        _instance = AzureStorageBackend()
+        log.info("storage backend: Azure Blob Storage")
     else:
         raise ValueError(
             f"Unknown STORAGE_BACKEND={backend!r}. "
-            "Expected 'local' or 's3'."
+            "Expected 'local', 's3', or 'azure'."
         )
     return _instance
 

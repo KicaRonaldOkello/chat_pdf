@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -111,25 +111,31 @@ class Settings(BaseSettings):
     jwt_expires_days: int = 30
 
     # CORS — comma-separated in env, e.g. CORS_ALLOW_ORIGINS="https://app.example.com,https://cdn.example.com"
-    cors_allow_origins: list[str] = []
-
-    @field_validator("cors_allow_origins", mode="before")
-    @classmethod
-    def _parse_cors(cls, v: object) -> list[str]:
-        if isinstance(v, str):
-            return [o.strip() for o in v.split(",") if o.strip()]
-        if isinstance(v, list):
-            return v
-        return []
+    cors_allow_origins: str = ""
 
     # Database
     database_url: str = ""
 
     # Storage
-    storage_backend: Literal["local", "s3"] = "local"
+    storage_backend: Literal["local", "s3", "azure"] = "local"
     s3_bucket: str = ""
     s3_key_prefix: str = "documents"
     aws_region: str = "us-east-1"
+    azure_storage_container_name: str = "chatpdfs"
+    azure_storage_connection_string: str = ""
+
+    # Loki log shipping (optional — set LOKI_ENABLED=true and LOKI_URL to activate)
+    loki_url: str = ""  # e.g. "http://localhost:3100"
+    loki_enabled: bool = False
+    loki_application_label: str = "chat-pdf-backend"
+
+    # Prometheus metrics endpoint (optional — set PROMETHEUS_ENABLED=true)
+    prometheus_enabled: bool = False
+
+    # OpenTelemetry (optional — set OTEL_ENABLED=true)
+    otel_enabled: bool = False
+    otel_service_name: str = "chat-pdf-backend"
+    otel_exporter_otlp_endpoint: str = ""  # e.g. "http://localhost:4318"
 
     # Upload limits
     max_pdf_upload_bytes: int = 5 * 1024 * 1024
@@ -140,11 +146,6 @@ class Settings(BaseSettings):
         if not self.ollama_openai_base_url:
             self.ollama_openai_base_url = f"{self.ollama_base_url.rstrip('/')}/v1"
         self.documents_dir = Path(self.chatpdf_data_dir) / "documents"
-        if not self.cors_allow_origins:
-            self.cors_allow_origins = [
-                "http://localhost:4200",
-                "http://127.0.0.1:4200",
-            ]
 
     @classmethod
     def override(cls, **overrides) -> "Settings":
