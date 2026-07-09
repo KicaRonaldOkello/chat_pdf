@@ -622,6 +622,50 @@ def assemble_document_meta(
     }
 
 
+def heuristic_build_sections_index(
+    sections: list[Section],
+) -> list[dict[str, Any]]:
+    """Build a sections_index using heuristics only — no LLM calls.
+
+    Uses :func:`heuristic_summary` and :func:`heuristic_keywords` on body
+    text (or title-only for sections with no body).  Produces the same shape
+    as the LLM-based enrichment path so query-time consumers are unaffected.
+    """
+    by_id: dict[str, SectionEnrichment] = {}
+    for s in sections:
+        body = section_body_text(s)
+        if body:
+            summary = heuristic_summary(body)
+            keywords = heuristic_keywords(body)
+        else:
+            summary = ""
+            keywords = heuristic_keywords(s.title) if s.title else []
+        by_id[s.id] = SectionEnrichment(summary=summary, keywords=keywords)
+    return assemble_sections_index(sections, by_id)
+
+
+def heuristic_build_document_meta(
+    root: Section,
+    *,
+    document_id: str,
+    filename: str,
+    num_pages: int,
+) -> dict[str, Any]:
+    """Build document_meta using heuristics only — no LLM calls.
+
+    The figure/table index is always populated from the tree structure.
+    LLM-inferred fields (doc_type, language, title, authors, abstract) are
+    left empty/default since no model is called.
+    """
+    return assemble_document_meta(
+        root,
+        inferred={},
+        document_id=document_id,
+        filename=filename,
+        num_pages=num_pages,
+    )
+
+
 def merge_section_response(
     by_id: dict[str, SectionEnrichment], parsed: dict[str, Any]
 ) -> None:

@@ -1,0 +1,37 @@
+# Environment files (injected at runtime)
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__
+*.pyc
+.venv
+*.egg-info
+
+# Tests
+tests/
+.pytest_cache
+
+# Data (mounted as volume or stored in Postgres/S3/Azure)
+data/
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+deploy.sh
+
+# Misc
+*.md
+.editorconfig

@@ -49,10 +49,11 @@ def verify_google_id_token(token: str) -> dict[str, Any]:
     if iss not in ("accounts.google.com", "https://accounts.google.com"):
         raise ValueError(f"Invalid issuer: {iss}")
 
-    # Validate required scopes
-    scope = claims.get("scope", "")
-    if "email" not in scope or "profile" not in scope:
-        raise ValueError(f"Insufficient token scopes: {scope}")
+    # ID tokens carry the email claim only when the `email` scope was granted
+    # during the OAuth flow. The `scope` field is an access-token concept, not
+    # present on an OpenID Connect ID token.
+    if not claims.get("email"):
+        raise ValueError("ID token missing email claim — ensure 'email' scope is requested during sign-in")
 
     return claims
 

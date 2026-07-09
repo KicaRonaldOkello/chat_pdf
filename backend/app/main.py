@@ -37,6 +37,10 @@ log = logging.getLogger("app.main")
 async def lifespan(_app: FastAPI):
     if settings.storage_backend == "s3" and not settings.s3_bucket:
         raise RuntimeError("S3_BUCKET is empty; set S3_BUCKET in the environment when using S3 storage backend.")
+    if settings.storage_backend == "azure" and not settings.azure_storage_connection_string:
+        raise RuntimeError(
+            "AZURE_STORAGE_CONNECTION_STRING is empty; set it when using Azure storage backend."
+        )
     if not settings.database_url:
         raise RuntimeError(
             "DATABASE_URL is required: document state (status, tree, meta) is stored in PostgreSQL."
@@ -58,6 +62,25 @@ async def lifespan(_app: FastAPI):
         log.error(f"Database connection failed: {e}")
         raise RuntimeError(f"Failed to connect to database: {e}") from e
 
+    # ── observability (optional — gated by env vars) ──────────────────────
+    if settings.loki_enabled and settings.loki_url:
+        from app.monitoring import setup_loki_logging
+
+        setup_loki_logging(settings.loki_url, settings.loki_application_label)
+
+    if settings.prometheus_enabled:
+        from app.monitoring import setup_prometheus
+
+        setup_prometheus(_app)
+
+    if settings.otel_enabled and settings.otel_exporter_otlp_endpoint:
+        from app.monitoring import _instrument_fastapi_app, setup_opentelemetry
+
+        setup_opentelemetry(
+            settings.otel_service_name, settings.otel_exporter_otlp_endpoint
+        )
+        _instrument_fastapi_app(_app)
+
     try:
         yield
     finally:
@@ -71,21 +94,28 @@ app = FastAPI(title="Chat PDF API", lifespan=lifespan)
 
 # ── security middleware ───────────────────────────────────────────────────────
 
+_cors_origins = [o.strip() for o in settings.cors_allow_origins.split(",") if o.strip()] or [
+    "http://localhost:4200",
+    "http://127.0.0.1:4200",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_allow_origins,
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Rate limiting (in-memory, per-IP)
+from slowapi import Limiter
 from slowapi import _rate_limit_exceeded_handler as _rl_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
-app.state.limiter_key_func = get_remote_address
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
 app.add_exception_handler(RateLimitExceeded, _rl_handler)
 

@@ -5,6 +5,7 @@ Replaces the former `app.store` filesystem under CHATPDF_DATA_DIR.
 
 from __future__ import annotations
 
+import logging
 import tempfile
 import uuid
 from collections.abc import AsyncIterator
@@ -20,8 +21,15 @@ from app.db.repositories.document_state import (
     DocumentStateRepository,
     DocumentStatus,
 )
+from app.processing.metadata import (
+    heuristic_build_sections_index,
+    heuristic_build_document_meta,
+)
+from app.processing.tree import deserialize as _deserialize_tree, walk_sections
 from app.runtime import get_db_session_maker
 from app.storage import get_storage
+
+log = logging.getLogger(__name__)
 
 # Re-export for call sites
 __all__ = [
@@ -111,7 +119,40 @@ async def get_sections_index(
         return None
     async with sm() as session:
         repo = DocumentStateRepository(session)
-        return await repo.get_sections_index(document_id)
+        result = await repo.get_sections_index(document_id)
+        if result is not None:
+            return result
+
+        # ── fallback: reconstruct from the stored structure tree ──────────
+        try:
+            status = await repo.get_status(document_id)
+            if status is None or status.status != "ready":
+                return None
+
+            tree_data = await repo.get_tree(document_id)
+            if tree_data is None:
+                return None
+
+            root = _deserialize_tree(tree_data)
+            sections = walk_sections(root)
+            if not sections:
+                return []
+
+            reconstructed = heuristic_build_sections_index(sections)
+            if reconstructed:
+                await repo.save_sections_index(document_id, reconstructed)
+                await session.commit()
+                log.info(
+                    "reconstructed sections_index (%d entries) from tree for %s",
+                    len(reconstructed),
+                    document_id,
+                )
+            return reconstructed
+        except Exception:
+            log.exception(
+                "Failed to reconstruct sections_index from tree for %s", document_id
+            )
+            return None
 
 
 async def save_document_meta(
@@ -130,7 +171,38 @@ async def get_document_meta(
         return None
     async with sm() as session:
         repo = DocumentStateRepository(session)
-        return await repo.get_document_meta(document_id)
+        result = await repo.get_document_meta(document_id)
+        if result is not None:
+            return result
+
+        # ── fallback: reconstruct from the stored structure tree ──────────
+        try:
+            status = await repo.get_status(document_id)
+            if status is None or status.status != "ready":
+                return None
+
+            tree_data = await repo.get_tree(document_id)
+            if tree_data is None:
+                return None
+
+            root = _deserialize_tree(tree_data)
+            reconstructed = heuristic_build_document_meta(
+                root,
+                document_id=document_id,
+                filename=str(tree_data.get("filename", "")),
+                num_pages=int(tree_data.get("num_pages", 0)),
+            )
+            await repo.save_document_meta(document_id, reconstructed)
+            await session.commit()
+            log.info(
+                "reconstructed document_meta from tree for %s", document_id
+            )
+            return reconstructed
+        except Exception:
+            log.exception(
+                "Failed to reconstruct document_meta from tree for %s", document_id
+            )
+            return None
 
 
 async def append_trace(

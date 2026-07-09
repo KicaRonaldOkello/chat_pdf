@@ -1,0 +1,31 @@
+# Production compose file for a VPS.
+#
+# Assumes PostgreSQL, Prometheus, Loki, and Grafana are already running on
+# the VPS (outside Docker or in another compose stack).  You only need to
+# set the connection URLs in your `.env` file.
+#
+# Usage:
+#   1. Create a `.env` file in this directory with your production values
+#      (copy .env.example and fill in real credentials).
+#   2. docker compose -f docker-compose.prod.yml pull   # get latest image
+#   3. docker compose -f docker-compose.prod.yml up -d  # start the app
+#
+# The app image is pulled from GitHub Container Registry.  The GitHub Actions
+# workflow in .github/workflows/build-push-ghcr.yml builds and pushes it on
+# every push to main.
+
+services:
+  api:
+    image: ghcr.io/${GHCR_OWNER:-you}/chat-pdf-backend:latest
+    container_name: chat_pdf_api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8055}:8000"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
