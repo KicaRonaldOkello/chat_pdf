@@ -23,6 +23,12 @@ export class AuthPageComponent implements OnInit {
   googleLoaded = signal(false);
 
   async ngOnInit(): Promise<void> {
+    // Already signed in — redirect straight to the app
+    if (this.authService.isSignedIn()) {
+      this.router.navigate(['/app']);
+      return;
+    }
+
     await this.authService.loadGoogleScript();
     this.googleLoaded.set(true);
 

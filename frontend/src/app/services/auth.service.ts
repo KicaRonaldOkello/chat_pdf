@@ -81,7 +81,7 @@ export class AuthService {
     try {
       const token = this._sessionToken();
       if (!token) return;
-      const resp = await fetch('/api/users/me', {
+      const resp = await fetch(`${environment.apiBaseUrl}/api/users/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!resp.ok) {
@@ -132,7 +132,7 @@ export class AuthService {
   async signInWithGoogle(credential: string): Promise<UserSyncResponse> {
     try {
       const response = await this.http.post<UserSyncResponse>(
-        '/api/users/sync',
+        `${environment.apiBaseUrl}/api/users/sync`,
         {},
         {
           headers: new HttpHeaders().set('Authorization', `Bearer ${credential}`)
