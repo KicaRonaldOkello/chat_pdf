@@ -47,6 +47,6 @@ jobs:
               exit 1
             }
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker compose -p prod -f docker-compose.prod.yml pull
-            docker compose -p prod -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
+            docker pull ghcr.io/${{ env.OWNER_LC }}/chat-pdf-backend:latest
+            docker compose -p chatpdf -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
             docker exec chat_pdf_api alembic upgrade head
