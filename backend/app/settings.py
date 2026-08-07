@@ -28,7 +28,9 @@ class Settings(BaseSettings):
 
     # Data directories
     chatpdf_data_dir: Path = _BACKEND_ROOT / "data"
-    documents_dir: Path = Field(default_factory=lambda: _BACKEND_ROOT / "data" / "documents")
+    documents_dir: Path = Field(
+        default_factory=lambda: _BACKEND_ROOT / "data" / "documents"
+    )
 
     # Embeddings
     embedding_model: str = "nomic-embed-text"
@@ -139,6 +141,29 @@ class Settings(BaseSettings):
 
     # Upload limits
     max_pdf_upload_bytes: int = 5 * 1024 * 1024
+
+    # PDF input / resource safeguards
+    max_pdf_pages: int = 500
+    max_pdf_decompressed_bytes: int = 256 * 1024 * 1024
+    max_pdf_images: int = 2000
+    processing_timeout_seconds: float = 1800.0
+
+    # Ingestion worker queue
+    worker_concurrency: int = 2
+    parse_concurrency: int = 2
+    embedding_concurrency: int = 4
+    worker_poll_interval_seconds: float = 5.0
+    worker_claim_timeout_seconds: float = 1800.0
+    worker_max_attempts: int = 3
+    worker_retry_base_seconds: float = 60.0
+    table_llm_concurrency: int = 2
+
+    # Table detection and description retries
+    table_page_pipe_min_lines: int = 3
+    table_page_numeric_min_lines: int = 2
+    table_page_line_min_len: int = 12
+    table_describer_max_retries: int = 2
+    table_describer_retry_base_seconds: float = 1.0
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

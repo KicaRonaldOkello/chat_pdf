@@ -84,12 +84,8 @@ class Section:
             level=int(data["level"]),
             path=str(data["path"]),
             page_range=[int(p) for p in data["page_range"]],
-            elements=[
-                ElementRef.from_dict(e) for e in data.get("elements", [])
-            ],
-            children=[
-                Section.from_dict(c) for c in data.get("children", [])
-            ],
+            elements=[ElementRef.from_dict(e) for e in data.get("elements", [])],
+            children=[Section.from_dict(c) for c in data.get("children", [])],
         )
 
 
@@ -249,22 +245,42 @@ def build_tree(elements: Iterable[Any]) -> tuple[Section, list[ElementRef], int]
     return root, all_elements, max_page
 
 
-def partition(pdf_file: Path) -> tuple[Section, list[ElementRef], int, list[str]]:
-    import os
+def partition(
+    pdf_file: Path,
+    *,
+    preflight: Any | None = None,
+) -> tuple[Section, list[ElementRef], int, list[str]]:
+    """Partition a PDF with Unstructured, routed by preflight classification.
 
+    ``preflight`` is the result of :func:`app.processing.preflight.classify_pdf`.
+    When it is omitted (tests, direct callers), the legacy behavior is kept:
+    a ``fast`` pass, falling back to ``hi_res`` only when extraction yields
+    essentially no text.  When provided, its ``route`` chooses the primary
+    strategy and its ``num_pages`` drives the post-extraction quality gate.
+    """
     from unstructured.partition.pdf import partition_pdf
 
-    warnings: list[str] = []
-    forced = os.getenv("UNSTRUCTURED_STRATEGY", "").strip().lower()
-    primary = forced or "fast"
+    from app.processing.preflight import quality_gate
 
-    try:
-        elements = partition_pdf(
+    warnings: list[str] = []
+    forced = _forced_strategy()
+    if preflight is not None and preflight.route:
+        primary: str = preflight.route
+        expected_pages: int = preflight.num_pages
+    else:
+        primary = forced or "fast"
+        expected_pages = 0
+
+    def _partition_with(strategy: str) -> list[Any]:
+        return partition_pdf(
             filename=str(pdf_file),
-            strategy=primary,
+            strategy=strategy,
             infer_table_structure=True,
             extract_images_in_pdf=False,
         )
+
+    try:
+        elements = _partition_with(primary)
     except Exception as e:
         if primary == "fast":
             raise
@@ -279,27 +295,37 @@ def partition(pdf_file: Path) -> tuple[Section, list[ElementRef], int, list[str]
             "Primary document analysis could not run; a simpler text-only pass was used instead. "
             "Tables, figures, and layout may be less accurate."
         )
-        elements = partition_pdf(
-            filename=str(pdf_file),
-            strategy="fast",
-            infer_table_structure=True,
-            extract_images_in_pdf=False,
-        )
+        elements = _partition_with("fast")
 
     if not forced and primary == "fast":
-        total_chars = sum(len(getattr(el, "text", "") or "") for el in elements)
-        if total_chars < 50:
+        gate_warnings = quality_gate(elements, expected_pages, classified_route="fast")
+        if gate_warnings:
+            warnings.extend(gate_warnings)
             try:
-                elements = partition_pdf(
-                    filename=str(pdf_file),
-                    strategy="hi_res",
-                    infer_table_structure=True,
-                    extract_images_in_pdf=False,
+                log.info(
+                    "fast extraction quality gate failed for %s (%s); "
+                    "retrying with hi_res",
+                    pdf_file,
+                    "; ".join(gate_warnings),
                 )
+                hi_res_elements = _partition_with("hi_res")
+                hi_res_gate = quality_gate(
+                    hi_res_elements, expected_pages, classified_route="hi_res"
+                )
+                if len(hi_res_gate) < len(gate_warnings):
+                    elements = hi_res_elements
+                    warnings = [w for w in hi_res_gate if "no usable text" not in w]
+                    warnings.insert(
+                        0,
+                        "The initial text-only pass looked low-quality; "
+                        "a layout-aware pass was used instead.",
+                    )
+                elif hi_res_gate and not any("no usable" in w for w in hi_res_gate):
+                    warnings.extend(
+                        "Layout-aware retry also produced incomplete output: " + w
+                        for w in hi_res_gate
+                    )
             except Exception as e:
-                # hi_res uses pypdfium2 + layout model; some PDFs fail with Pdfium
-                # "Data format error" or similar while fast/pdfminer text still works;
-                # others are simply too short (scanned/cover) — keep the fast result.
                 log.warning(
                     "hi_res partition failed (%s: %s); continuing with fast output only: %s",
                     type(e).__name__,
@@ -307,10 +333,18 @@ def partition(pdf_file: Path) -> tuple[Section, list[ElementRef], int, list[str]
                     pdf_file,
                 )
                 warnings.append(
-                    "Layout-aware processing could not run for this file (format or rendering issue). "
-                    "The manuscript was indexed from basic text only. "
-                    "Structure, tables, and figures may be incomplete."
+                    "Layout-aware processing could not run for this file "
+                    "(format or rendering issue). The manuscript was indexed "
+                    "from basic text only. Structure, tables, and figures "
+                    "may be incomplete."
                 )
 
     root, all_elements, num_pages = build_tree(elements)
     return root, all_elements, num_pages, warnings
+
+
+def _forced_strategy() -> str | None:
+    import os
+
+    value = os.getenv("UNSTRUCTURED_STRATEGY", "").strip().lower()
+    return value or None

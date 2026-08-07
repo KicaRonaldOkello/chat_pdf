@@ -77,16 +77,28 @@ def token_split(text: str, target: int, overlap: int) -> list[str]:
     if not text.strip():
         return []
     tokens = ENC.encode(text)
+    return [
+        ENC.decode(tokens[start:end])
+        for start, end in token_windows(tokens, target, overlap)
+    ]
+
+
+def token_windows(
+    tokens: list[int], target: int, overlap: int
+) -> list[tuple[int, int]]:
+    """Return overlapping token offsets for a non-empty token sequence."""
+    if not tokens:
+        return []
     if len(tokens) <= target:
-        return [text]
+        return [(0, len(tokens))]
     step = max(1, target - overlap)
-    out: list[str] = []
+    out: list[tuple[int, int]] = []
     for start in range(0, len(tokens), step):
-        window = tokens[start : start + target]
-        if not window:
+        end = min(start + target, len(tokens))
+        if start >= end:
             break
-        out.append(ENC.decode(window))
-        if start + target >= len(tokens):
+        out.append((start, end))
+        if end >= len(tokens):
             break
     return out
 
@@ -136,6 +148,49 @@ def mk_id(doc_id: str, *parts: str) -> str:
     return f"{doc_id}::" + "::".join(parts)
 
 
+def section_label(section: Section) -> str:
+    """Return the retrieval label for a section, including root content.
+
+    ``build_tree`` deliberately gives the synthetic root an empty path.  It can
+    still contain real document content that appears before the first heading,
+    so chunks created from it need a stable, human-readable label.
+    """
+    return section.path or "Document"
+
+
+def _page_element_groups(
+    elements: list[ElementRef],
+) -> list[tuple[int, list[ElementRef]]]:
+    """Group elements by page while retaining their source order within a page."""
+    by_page: dict[int, list[ElementRef]] = {}
+    for element in elements:
+        by_page.setdefault(element.page, []).append(element)
+    return list(by_page.items())
+
+
+def _tokenize_elements(
+    elements: list[ElementRef], *, watermark_texts: set[str]
+) -> tuple[list[int], list[tuple[ElementRef, int, int]]]:
+    """Return a page token stream and the token range belonging to each element."""
+    tokens: list[int] = []
+    spans: list[tuple[ElementRef, int, int]] = []
+    separator = ENC.encode("\n\n")
+
+    for element in elements:
+        if not element.text or element.text in watermark_texts:
+            continue
+        element_tokens = ENC.encode(element.text)
+        if not element_tokens:
+            continue
+        if tokens:
+            tokens.extend(separator)
+        start = len(tokens)
+        tokens.extend(element_tokens)
+        spans.append((element, start, len(tokens)))
+
+    return tokens, spans
+
+
 def chunk_section_text(
     section: Section,
     doc_id: str,
@@ -147,47 +202,49 @@ def chunk_section_text(
     if not text_els:
         return [], next_idx
 
-    blob_parts: list[str] = []
-    element_ids: list[str] = []
-    first_page = section.page_range[0]
     _skip = watermark_texts or set()
-    for e in text_els:
-        if not e.text or e.text in _skip:
-            continue
-        blob_parts.append(e.text)
-        element_ids.append(e.id)
-    if not blob_parts:
-        return [], next_idx
-    blob = "\n\n".join(blob_parts)
-
-    bbox, page_size = union_bbox(text_els, first_page)
-
-    windows = token_split(blob, settings.chunk_tokens, settings.chunk_overlap)
+    section_path = section_label(section)
     chunks: list[Chunk] = []
-    for w in windows:
-        cid = mk_id(doc_id, "text", str(next_idx))
-        next_idx += 1
-        embed = f"{section.path}\n\n{w}"
-        chunks.append(
-            Chunk(
-                chunk_id=cid,
-                document_id=doc_id,
-                element_ids=element_ids,
-                type="text",
-                section_path=section.path,
-                page=first_page,
-                text_for_embedding=embed,
-                display_text=w,
-                bbox=bbox,
-                page_size=page_size,
+    for page, page_elements in _page_element_groups(text_els):
+        tokens, spans = _tokenize_elements(page_elements, watermark_texts=_skip)
+        for start, end in token_windows(
+            tokens, settings.chunk_tokens, settings.chunk_overlap
+        ):
+            window_elements = [
+                element
+                for element, element_start, element_end in spans
+                if element_start < end and element_end > start
+            ]
+            if not window_elements:
+                continue
+            text = ENC.decode(tokens[start:end]).strip()
+            if not text:
+                continue
+            bbox, page_size = union_bbox(window_elements, page)
+            cid = mk_id(doc_id, "text", str(next_idx))
+            next_idx += 1
+            embed = f"{section_path}\n\n{text}"
+            chunks.append(
+                Chunk(
+                    chunk_id=cid,
+                    document_id=doc_id,
+                    element_ids=[element.id for element in window_elements],
+                    type="text",
+                    section_path=section_path,
+                    page=page,
+                    text_for_embedding=embed,
+                    display_text=text,
+                    bbox=bbox,
+                    page_size=page_size,
+                )
             )
-        )
     return chunks, next_idx
 
 
 def chunk_table(
     section: Section, el: ElementRef, doc_id: str, next_idx: int
 ) -> tuple[Chunk | None, int]:
+    section_path = section_label(section)
     markdown = str(el.extra.get("markdown") or "")
     description = str(el.extra.get("description") or "")
     html = str(el.extra.get("html") or "")
@@ -282,9 +339,7 @@ def chunk_table(
         )
         display = "\n\n".join(display_parts)
 
-        table_path = get_storage().put_table_markdown(
-            doc_id, table_index, markdown
-        )
+        table_path = get_storage().put_table_markdown(doc_id, table_index, markdown)
         extra = {
             "caption": caption_source,
             "table_rows": data_rows,
@@ -300,7 +355,7 @@ def chunk_table(
             document_id=doc_id,
             element_ids=[el.id],
             type="table",
-            section_path=section.path,
+            section_path=section_path,
             page=el.page,
             text_for_embedding=embed,
             display_text=display,
@@ -315,6 +370,7 @@ def chunk_table(
 def chunk_image(
     section: Section, el: ElementRef, doc_id: str, next_idx: int
 ) -> tuple[Chunk | None, int]:
+    section_path = section_label(section)
     caption = str(el.extra.get("caption") or el.text or "")
     description = str(el.extra.get("description") or "")
     image_path = str(el.extra.get("path") or "")
@@ -325,7 +381,10 @@ def chunk_image(
     if not image_path and not caption and not section.path:
         return None, next_idx
 
-    header = f"[Figure on p.{el.page}]"
+    if el.extra.get("vector_visual"):
+        header = f"[Vector chart/diagram on p.{el.page}]"
+    else:
+        header = f"[Figure on p.{el.page}]"
     if caption:
         header += f" {caption}"
 
@@ -337,7 +396,7 @@ def chunk_image(
     if description:
         embed_parts.append(description)
     else:
-        embed_parts.append(f"Section: {section.path}")
+        embed_parts.append(f"Section: {section_path}")
         # Nearby text from the same page — pre-computed during ingestion
         # so image chunks have topical keywords for retrieval.
         nearby = str(el.extra.get("nearby_text") or "")
@@ -358,7 +417,7 @@ def chunk_image(
             document_id=doc_id,
             element_ids=[el.id],
             type="image",
-            section_path=section.path,
+            section_path=section_path,
             page=el.page,
             text_for_embedding="\n".join(embed_parts),
             display_text="\n".join(display_parts),
@@ -393,7 +452,11 @@ def _find_watermark_texts(sections: list[Section]) -> set[str]:
 
 def build_chunks(root: Section, document_id: str) -> list[Chunk]:
     sections: list[Section] = list(walk_sections(root))
-    if not sections or any(e.type != "text" for e in root.elements):
+    # ``walk_sections`` excludes the synthetic root.  The root can contain
+    # genuine preamble content before the first detected heading, so include it
+    # whenever it has elements.  It is inserted only once and cannot duplicate
+    # child-section content.
+    if root.elements:
         sections.insert(0, root)
 
     watermark_texts = _find_watermark_texts(sections)

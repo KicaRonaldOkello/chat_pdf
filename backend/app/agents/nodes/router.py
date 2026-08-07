@@ -65,7 +65,11 @@ def detect_terminology_patterns(entries: list[dict[str, Any]]) -> dict[str, list
     }
 
     all_text = " ".join(
-        e.get("title", "") + " " + e.get("summary", "") + " " + " ".join(e.get("keywords", []))
+        e.get("title", "")
+        + " "
+        + e.get("summary", "")
+        + " "
+        + " ".join(e.get("keywords", []))
         for e in entries
     )
 
@@ -77,7 +81,18 @@ def detect_terminology_patterns(entries: list[dict[str, Any]]) -> dict[str, list
     abbr_pattern = re.compile(r"\b[A-Z]{2,4}\b")
     abbrs = abbr_pattern.findall(all_text)
     # Filter out common words that aren't abbreviations
-    common_words = {"THE", "AND", "FOR", "WITH", "FROM", "THIS", "THAT", "ARE", "WAS", "WERE"}
+    common_words = {
+        "THE",
+        "AND",
+        "FOR",
+        "WITH",
+        "FROM",
+        "THIS",
+        "THAT",
+        "ARE",
+        "WAS",
+        "WERE",
+    }
     patterns["abbreviations"] = [a for a in abbrs if a not in common_words]
 
     # Detect date formats (Dec-25, Apr-26, etc.)
@@ -85,7 +100,9 @@ def detect_terminology_patterns(entries: list[dict[str, Any]]) -> dict[str, list
     patterns["date_formats"] = list(set(date_pattern.findall(all_text)))
 
     # Detect legal/technical identifiers (e.g., 347 U.S. 483, part number 5678)
-    identifier_pattern = re.compile(r"\b\d+\s+[A-Z]+\s+\d+\b|\bpart\s+number\s+\w+\b", re.IGNORECASE)
+    identifier_pattern = re.compile(
+        r"\b\d+\s+[A-Z]+\s+\d+\b|\bpart\s+number\s+\w+\b", re.IGNORECASE
+    )
     patterns["identifiers"] = list(set(identifier_pattern.findall(all_text)))
 
     # Detect data type indicators
@@ -97,8 +114,11 @@ def detect_terminology_patterns(entries: list[dict[str, Any]]) -> dict[str, list
         (r"\b(?:code|identifier)\b", "codes"),
     ]
     for pattern, dtype in data_type_patterns:
-        if re.search(pattern, all_text, re.IGNORECASE) and dtype not in patterns["data_types"]:
-                patterns["data_types"].append(dtype)
+        if (
+            re.search(pattern, all_text, re.IGNORECASE)
+            and dtype not in patterns["data_types"]
+        ):
+            patterns["data_types"].append(dtype)
 
     # Extract entities from keywords and titles (capitalized phrases)
     entity_pattern = re.compile(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b")
@@ -125,6 +145,9 @@ def compact_meta(meta: dict[str, Any] | None) -> str:
     abs_ = (meta.get("abstract") or "").strip()
     if abs_:
         bits.append(f"abstract: {abs_[:500]}")
+    visual_pages = meta.get("visual_pages") or []
+    if visual_pages:
+        bits.append(f"visual_pages: {', '.join(str(p) for p in visual_pages[:30])}")
     return "\n".join(bits)
 
 
@@ -152,16 +175,26 @@ async def render_user(state: GraphState, *, avoid_route: str | None = None) -> s
             if patterns["codes"]:
                 pattern_parts.append(f"codes: {', '.join(patterns['codes'][:5])}")
             if patterns["abbreviations"]:
-                pattern_parts.append(f"abbreviations: {', '.join(patterns['abbreviations'][:5])}")
+                pattern_parts.append(
+                    f"abbreviations: {', '.join(patterns['abbreviations'][:5])}"
+                )
             if patterns["date_formats"]:
-                pattern_parts.append(f"date formats: {', '.join(patterns['date_formats'][:5])}")
+                pattern_parts.append(
+                    f"date formats: {', '.join(patterns['date_formats'][:5])}"
+                )
             if patterns["identifiers"]:
-                pattern_parts.append(f"identifiers: {', '.join(patterns['identifiers'][:3])}")
+                pattern_parts.append(
+                    f"identifiers: {', '.join(patterns['identifiers'][:3])}"
+                )
             if patterns["entities"]:
                 pattern_parts.append(f"entities: {', '.join(patterns['entities'][:5])}")
             if patterns["data_types"]:
-                pattern_parts.append(f"data types: {', '.join(patterns['data_types'][:3])}")
-            pattern_summary = "\nDetected terminology patterns:\n  " + "\n  ".join(pattern_parts)
+                pattern_parts.append(
+                    f"data types: {', '.join(patterns['data_types'][:3])}"
+                )
+            pattern_summary = "\nDetected terminology patterns:\n  " + "\n  ".join(
+                pattern_parts
+            )
 
         parts.append(
             f"---\ndocument_id: {did}\n"
@@ -238,7 +271,9 @@ async def run(state: GraphState) -> dict[str, Any]:
             logger.log_info(f"Time range: {plan.time_range_description}")
         if plan.constraints_description:
             logger.log_info(f"Constraints: {plan.constraints_description}")
-        logger.log_info(f"Route: {plan.route}, Variants: {len(plan.query_variants or [])}")
+        logger.log_info(
+            f"Route: {plan.route}, Variants: {len(plan.query_variants or [])}"
+        )
     except Exception as e:
         logger.log_error("Structured output failed, using fallback", e)
         log.debug("router structured output failed; using fallback", exc_info=True)
@@ -258,17 +293,21 @@ async def run(state: GraphState) -> dict[str, Any]:
     det_variants = set(expand_query_variants(plan.rewritten_query or state["query"]))
     all_variants = list(llm_variants | det_variants)
     if len(all_variants) > len(plan.query_variants or []):
-        logger.log_debug(f"Expanded variants: {len(plan.query_variants or [])} → {len(all_variants)}")
+        logger.log_debug(
+            f"Expanded variants: {len(plan.query_variants or [])} → {len(all_variants)}"
+        )
         plan = plan.model_copy(update={"query_variants": all_variants})
 
-    journey_data = logger.log_complete({
-        "route": plan.route,
-        "intent": plan.query_intent,
-        "entities": plan.key_entities,
-        "time_range": plan.time_range_description,
-        "constraints": plan.constraints_description,
-        "variants_count": len(plan.query_variants or []),
-    })
+    journey_data = logger.log_complete(
+        {
+            "route": plan.route,
+            "intent": plan.query_intent,
+            "entities": plan.key_entities,
+            "time_range": plan.time_range_description,
+            "constraints": plan.constraints_description,
+            "variants_count": len(plan.query_variants or []),
+        }
+    )
 
     step = {
         "node": "router",

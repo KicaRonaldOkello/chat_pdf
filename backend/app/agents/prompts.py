@@ -68,7 +68,7 @@ def get_router_prompt() -> str:
         "- Map user terms to document terminology (e.g., 'taxes' → 'VAT, income tax, corporate tax')\n"
         "- Generate 3-6 query variants with different date formats, synonyms, or phrasings\n"
         "- Include document-specific codes, abbreviations, and identifiers\n\n"
-        "Date format expansion: \"December 2025\" → [\"Dec-25\", \"Dec 2025\", \"12/2025\", \"12-25\"]\n\n"
+        'Date format expansion: "December 2025" → ["Dec-25", "Dec 2025", "12/2025", "12-25"]\n\n'
         "Domain-specific terminology based on detected patterns:\n"
         "- Medical: ICD codes, generic/brand names\n"
         "- Legal: case citations, statute references\n"
@@ -76,7 +76,9 @@ def get_router_prompt() -> str:
         "- Financial: indicator codes, ticker symbols\n\n"
         "VISION DETECTION:\n"
         "- Set needs_vision=true for figures, diagrams, charts, images, signatures, visual layout\n"
-        "- Leave vision_pages empty (vision node derives from retrieved chunks)\n\n"
+        "- When Document metadata lists visual_pages, nominate the relevant "
+        "ones in vision_pages; otherwise leave it empty (the vision node "
+        "derives candidates from retrieved image chunks)\n\n"
         "Respond with STRICT JSON only: "
         '{"route": "structural|semantic|hybrid", '
         '"section_ids": ["doc-uuid:sec-...", ...], '
@@ -116,7 +118,7 @@ def get_answerer_system_prompt(*, multi_doc: bool = False) -> str:
         "- If column headers are ambiguous or multi-line, cross-reference "
         "the row label to confirm you have the right column.\n"
         "- Never guess a month or date for a value unless the column header "
-        "explicitly labels it.  \"Feb-2026\" and \"February 2026\" may be "
+        'explicitly labels it.  "Feb-2026" and "February 2026" may be '
         "different columns.\n"
         "- When a table has narrative text mixed with data rows, prefer "
         "the narrative for context and the table rows for exact values.\n"
@@ -124,10 +126,10 @@ def get_answerer_system_prompt(*, multi_doc: bool = False) -> str:
         "to, say so rather than guessing.\n\n"
         "Formatting rules:\n"
         "- NEVER use LaTeX math notation (\\[ ... \\], \\frac, \\text, etc.).\n"
-        "- Write formulas in plain text, e.g. \"Trade Balance = Exports − Imports\"\n"
-        "  or \"Annualised yield = (Face − Price) / Price × (365 / Days) × 100%\".\n"
+        '- Write formulas in plain text, e.g. "Trade Balance = Exports − Imports"\n'
+        '  or "Annualised yield = (Face − Price) / Price × (365 / Days) × 100%".\n'
         "- Use Unicode symbols (×, ÷, −, ≈, ≤, ≥) instead of LaTeX commands.\n"
-        "- Use plain fractions like \"a/b\" instead of \\frac{a}{b}."
+        '- Use plain fractions like "a/b" instead of \\frac{a}{b}.'
     )
     if multi_doc:
         base += (

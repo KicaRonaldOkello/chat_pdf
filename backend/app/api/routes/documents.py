@@ -32,7 +32,15 @@ async def _store_display_for_uploaded(doc_id: str) -> tuple[str, str]:
     st = s.status
     if st == "ready":
         return st, "analyzed"
-    if st == "error":
+    if st in (
+        "error",
+        "failed",
+        "invalid",
+        "encrypted",
+        "resource_limit",
+        "parser_failure",
+        "partial",
+    ):
         return st, "error"
     return st, "processing"
 
@@ -146,9 +154,7 @@ async def get_document_pdf_file(
     try:
         chunks = get_storage().get_source_pdf_streaming(doc_id)
     except FileNotFoundError as err:
-        raise HTTPException(
-            status_code=404, detail="PDF not found in storage"
-        ) from err
+        raise HTTPException(status_code=404, detail="PDF not found in storage") from err
     except Exception as err:
         raise HTTPException(
             status_code=502, detail="Could not read PDF from storage"
@@ -207,9 +213,7 @@ async def document_meta(doc_id: str) -> JSONResponse:
 
 @router.get("/{doc_id}/traces")
 async def document_traces(doc_id: str) -> JSONResponse:
-    return JSONResponse(
-        content=await document_data.list_traces(doc_id)
-    )
+    return JSONResponse(content=await document_data.list_traces(doc_id))
 
 
 @router.post("/{doc_id}/search")
