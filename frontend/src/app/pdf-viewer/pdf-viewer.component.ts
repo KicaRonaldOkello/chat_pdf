@@ -275,6 +275,7 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
     this.loading = true;
     this.error = null;
     this.pdfReady = false;
+    await this.renderService.cancelRender();
     this.highlightManager.clearHighlights();
     this.searchManager.clearResults();
     this.syncSearchState();
@@ -299,7 +300,18 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
         void this.renderThumbnails();
       }
     } catch (e) {
-      this.error = e instanceof Error ? e.message : String(e);
+      const message = e instanceof Error ? e.message : String(e);
+      if (
+        message.includes('worker is being destroyed') ||
+        message.includes('Worker was destroyed') ||
+        message.includes('Loading task cancelled')
+      ) {
+        // Teardown race while swapping documents — the replacement load is
+        // already queued and will render this document fresh.
+        console.warn('[PdfViewer] suppressed document-swap teardown error', message);
+        return;
+      }
+      this.error = message;
     } finally {
       this.loading = false;
     }

@@ -7,15 +7,21 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.agents.clients import openrouter_json
+from app.agents.schemas import RouterPlan
+
+
+def _router_plan(route: str = "semantic") -> RouterPlan:
+    return RouterPlan(
+        route=route,  # type: ignore[arg-type]
+        rewritten_query="query",
+    )
 
 
 @pytest.mark.asyncio
 async def test_openrouter_json_missing_api_key_returns_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        "app.clients.settings.openrouter_api_key", ""
-    )
+    monkeypatch.setattr("app.clients.settings.openrouter_api_key", "")
     out = await openrouter_json(model="m", system="s", user="u")
     assert out is None
 
@@ -24,9 +30,7 @@ async def test_openrouter_json_missing_api_key_returns_none(
 async def test_openrouter_json_success_parses_choice_content(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        "app.clients.settings.openrouter_api_key", "sk-test"
-    )
+    monkeypatch.setattr("app.clients.settings.openrouter_api_key", "sk-test")
     mock_client = MagicMock()
     mock_response = MagicMock()
     mock_response.choices = [MagicMock()]
@@ -49,9 +53,7 @@ async def test_openrouter_json_success_parses_choice_content(
 async def test_openrouter_json_default_reasoning_is_minimal(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        "app.clients.settings.openrouter_api_key", "k"
-    )
+    monkeypatch.setattr("app.clients.settings.openrouter_api_key", "k")
     mock_client = MagicMock()
     mock_response = MagicMock()
     mock_response.choices = [MagicMock()]
@@ -70,9 +72,7 @@ async def test_openrouter_json_default_reasoning_is_minimal(
 async def test_openrouter_json_reasoning_payload_minimal(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        "app.clients.settings.openrouter_api_key", "k"
-    )
+    monkeypatch.setattr("app.clients.settings.openrouter_api_key", "k")
     mock_client = MagicMock()
     mock_response = MagicMock()
     mock_response.choices = [MagicMock()]
@@ -81,8 +81,11 @@ async def test_openrouter_json_reasoning_payload_minimal(
 
     with patch("app.clients.AsyncOpenAI", return_value=mock_client):
         await openrouter_json(
-            model="m", system="s", user="u",
-            include_reasoning=True, high_reasoning_effort=False,
+            model="m",
+            system="s",
+            user="u",
+            include_reasoning=True,
+            high_reasoning_effort=False,
         )
 
     assert mock_client.chat.completions.create.call_args.kwargs["extra_body"] == {
@@ -94,9 +97,7 @@ async def test_openrouter_json_reasoning_payload_minimal(
 async def test_openrouter_json_reasoning_payload_high(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        "app.clients.settings.openrouter_api_key", "k"
-    )
+    monkeypatch.setattr("app.clients.settings.openrouter_api_key", "k")
     mock_client = MagicMock()
     mock_response = MagicMock()
     mock_response.choices = [MagicMock()]
@@ -105,8 +106,11 @@ async def test_openrouter_json_reasoning_payload_high(
 
     with patch("app.clients.AsyncOpenAI", return_value=mock_client):
         await openrouter_json(
-            model="m", system="s", user="u",
-            include_reasoning=True, high_reasoning_effort=True,
+            model="m",
+            system="s",
+            user="u",
+            include_reasoning=True,
+            high_reasoning_effort=True,
         )
 
     assert mock_client.chat.completions.create.call_args.kwargs["extra_body"] == {
@@ -118,13 +122,9 @@ async def test_openrouter_json_reasoning_payload_high(
 async def test_openrouter_json_raises_returns_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        "app.clients.settings.openrouter_api_key", "k"
-    )
+    monkeypatch.setattr("app.clients.settings.openrouter_api_key", "k")
     mock_client = MagicMock()
-    mock_client.chat.completions.create = AsyncMock(
-        side_effect=ValueError("boom")
-    )
+    mock_client.chat.completions.create = AsyncMock(side_effect=ValueError("boom"))
     with patch("app.clients.AsyncOpenAI", return_value=mock_client):
         out = await openrouter_json(model="m", system="s", user="u")
     assert out is None
@@ -134,9 +134,7 @@ async def test_openrouter_json_raises_returns_none(
 async def test_openrouter_json_garbage_content_returns_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        "app.clients.settings.openrouter_api_key", "k"
-    )
+    monkeypatch.setattr("app.clients.settings.openrouter_api_key", "k")
     mock_client = MagicMock()
     mock_response = MagicMock()
     mock_response.choices = [MagicMock()]
@@ -146,3 +144,51 @@ async def test_openrouter_json_garbage_content_returns_none(
     with patch("app.clients.AsyncOpenAI", return_value=mock_client):
         out = await openrouter_json(model="m", system="s", user="u")
     assert out is None
+
+
+@pytest.mark.asyncio
+async def test_router_retries_with_correction_after_invalid_route() -> None:
+    """The router retries when the LLM puts an intent word in `route`."""
+    from langchain_core.exceptions import OutputParserException
+
+    from app.agents.nodes import router as router_node
+
+    llm = MagicMock()
+    structured = MagicMock()
+    calls = {"n": 0}
+
+    async def _ainvoke(_messages):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise OutputParserException(
+                'Failed to parse RouterPlan from completion {"route": "compare"}'
+            )
+        return _router_plan("hybrid")
+
+    structured.ainvoke = _ainvoke
+    llm.with_structured_output.return_value = structured
+
+    state = {
+        "query": "Compare May and June reports",
+        "document_ids": ["doc-1", "doc-2"],
+        "history": [],
+        "attempts": 0,
+    }
+
+    with (
+        patch.object(router_node, "get_llm", return_value=llm),
+        patch.object(
+            router_node,
+            "render_user",
+            new_callable=lambda: AsyncMock(return_value="context"),
+        ),
+        patch.object(
+            router_node,
+            "fallback_heuristic",
+            new_callable=lambda: AsyncMock(return_value=_router_plan("semantic")),
+        ),
+    ):
+        out = await router_node.run(state)
+
+    assert calls["n"] == 2
+    assert out["plan"]["route"] == "hybrid"

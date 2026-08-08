@@ -96,7 +96,16 @@ export class PdfThumbnailManager {
       btn.appendChild(canvas);
       host.appendChild(btn);
 
-      await page.render({ canvasContext: ctx, viewport, transform }).promise;
+      try {
+        await page.render({ canvasContext: ctx, viewport, transform }).promise;
+      } catch {
+        // Document was swapped while thumbnails were rendering; the new
+        // document triggers its own thumbnail pass, so this is safe to drop.
+        return;
+      }
+      if (token !== this.thumbsRenderToken) {
+        return;
+      }
     }
   }
 

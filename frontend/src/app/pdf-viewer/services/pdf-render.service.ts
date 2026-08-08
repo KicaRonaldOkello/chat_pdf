@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import type { PDFDocumentProxy } from 'pdfjs-dist';
+import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 
 import {
   PDF_MAX_SCALE_FACTOR,
@@ -16,6 +16,34 @@ import type { PageRenderResult, RenderConfig, RenderOptions } from '../interface
 })
 export class PdfRenderService {
   private isRepainting = false;
+  private currentRenderTask: RenderTask | null = null;
+  private renderCancelled = false;
+  private activePass: Promise<boolean> | null = null;
+
+  /**
+   * Cancel any in-flight page render. Called before destroying the document
+   * so a still-running render never races the worker teardown.
+   */
+  async cancelRender(): Promise<void> {
+    this.renderCancelled = true;
+    this.currentRenderTask?.cancel();
+    // Wait for the in-flight pass to settle so it can never append stale
+    // pages after the document/worker is destroyed.
+    if (this.activePass) {
+      try {
+        await this.activePass;
+      } catch {
+        // The pass was cancelled — this is expected during a document swap.
+      }
+    }
+  }
+
+  /**
+   * Prepare for a new render pass (clears the cancellation flag).
+   */
+  beginRenderPass(): void {
+    this.renderCancelled = false;
+  }
 
   /**
    * Render a single PDF page to a DOM element.
@@ -63,7 +91,13 @@ export class PdfRenderService {
     inner.appendChild(canvas);
     wrapper.appendChild(inner);
 
-    await page.render({ canvasContext: ctx, viewport, transform }).promise;
+    const renderTask = page.render({ canvasContext: ctx, viewport, transform });
+    this.currentRenderTask = renderTask;
+    try {
+      await renderTask.promise;
+    } finally {
+      this.currentRenderTask = null;
+    }
 
     return {
       element: wrapper,
@@ -88,8 +122,9 @@ export class PdfRenderService {
       return false;
     }
     this.isRepainting = true;
+    this.beginRenderPass();
 
-    try {
+    const pass = (async (): Promise<boolean> => {
       const { host, zoomPercent, generation, onPageRendered } = config;
 
       if (generation !== this.loadGeneration) {
@@ -106,7 +141,7 @@ export class PdfRenderService {
       const fragment = document.createDocumentFragment();
 
       for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
-        if (generation !== this.loadGeneration) {
+        if (generation !== this.loadGeneration || this.renderCancelled) {
           return false;
         }
 
@@ -125,14 +160,28 @@ export class PdfRenderService {
       }
 
       // Batch insert all pages at once to minimize layout thrashing
-      host.appendChild(fragment);
+      if (generation !== this.loadGeneration || this.renderCancelled) {
+        return false;
+      }
+      try {
+        host.appendChild(fragment);
+      } catch {
+        // A stale pass raced the host teardown; the current pass owns the
+        // host and will render its own pages.
+        return false;
+      }
 
       // Force a layout calculation
       host.offsetHeight; // Trigger reflow
+      return true;
+    })();
+    this.activePass = pass;
+    try {
+      return await pass;
     } finally {
       this.isRepainting = false;
+      this.activePass = null;
     }
-    return true;
   }
 
   /**

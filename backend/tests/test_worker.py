@@ -39,6 +39,27 @@ async def test_run_worker_once_empty_queue_returns_none() -> None:
     repo.claim_next.assert_awaited_once()
 
 
+async def test_run_worker_once_commits_claim_before_processing() -> None:
+    repo = _repo()
+    repo.claim_next = AsyncMock(return_value=_row())
+    order: list[str] = []
+    commits = {"n": 0}
+
+    async def _commit() -> None:
+        commits["n"] += 1
+        order.append("commit")
+
+    async def _processor(doc_id: str, attempt: int) -> RunOutcome:
+        order.append("process")
+        return RunOutcome(status="ready", retryable=False)
+
+    await run_worker_once(repo, processor=_processor, commit=_commit)
+
+    assert order == ["commit", "process"]
+    assert commits["n"] == 1
+    repo.release_claim.assert_awaited_once_with("doc-1")
+
+
 async def test_run_worker_once_ready_releases_claim() -> None:
     repo = _repo()
     repo.claim_next = AsyncMock(return_value=_row())

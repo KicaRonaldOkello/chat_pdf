@@ -221,7 +221,7 @@ async def document_search(doc_id: str, body: SearchRequest) -> JSONResponse:
     status_ = await document_data.get_status(doc_id)
     if status_ is None:
         raise HTTPException(status_code=404, detail="Unknown document_id")
-    if status_.status != "ready":
+    if status_.status not in ("ready", "partial"):
         progress_pct = int(status_.progress * 100)
         raise HTTPException(
             status_code=409,

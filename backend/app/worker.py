@@ -28,6 +28,10 @@ log = logging.getLogger(__name__)
 ProcessorFn = Callable[[str, int], Awaitable[RunOutcome]]
 
 
+class QueueSchemaError(RuntimeError):
+    """Raised when the worker-queue columns are missing (migration not run)."""
+
+
 def retry_delay(attempt: int) -> float:
     """Exponential backoff: base * 2^(attempt-1)."""
     return settings.worker_retry_base_seconds * (2 ** max(0, attempt - 1))
@@ -37,15 +41,21 @@ async def run_worker_once(
     repo: DocumentStateRepository,
     *,
     processor: ProcessorFn = process_document,
+    commit: Callable[[], Awaitable[None]] | None = None,
 ) -> RunOutcome | None:
     """Claim one due document and process it, applying the retry policy.
 
     Returns the outcome when a document was processed, ``None`` when the queue
-    was empty.  The caller owns the transaction (commits/releases).
+    was empty.  ``commit`` is awaited right after claiming so the row lock is
+    released before processing starts — otherwise ``process_document``'s
+    status writes block on the same row and the document looks stuck in
+    ``queued`` until the whole run finishes.
     """
     row = await repo.claim_next(lease_seconds=settings.worker_claim_timeout_seconds)
     if row is None:
         return None
+    if commit is not None:
+        await commit()
 
     doc_id = row.document_id
     attempt = max(1, (row.attempts or 0) + 1)
@@ -98,6 +108,29 @@ async def recover_stale(repo: DocumentStateRepository) -> int:
     return len(recovered)
 
 
+async def _check_queue_schema(repo: DocumentStateRepository) -> None:
+    """Fail fast with an actionable message when the queue columns are missing.
+
+    The worker depends on the ``document_state.attempts`` /
+    ``next_attempt_at`` / ``claimed_until`` columns added by migration 0008.
+    Without them every poll cycle errors and documents stay ``queued``
+    forever, so detect this once at startup instead of silently retrying.
+    """
+    try:
+        await repo.claim_next(lease_seconds=1)
+    except Exception as exc:
+        msg = str(exc).lower()
+        if "column" in msg and ("does not exist" in msg or "no such column" in msg):
+            raise QueueSchemaError(
+                "Worker queue columns are missing from document_state. "
+                "Run the database migration first: "
+                "`alembic upgrade head` (the deploy workflow runs "
+                "`docker exec chat_pdf_api alembic upgrade head`). "
+                f"Underlying error: {exc}"
+            ) from exc
+        raise
+
+
 async def run_worker(
     *,
     stop_event: asyncio.Event | None = None,
@@ -111,6 +144,7 @@ async def run_worker(
 
     # Startup recovery: never leave documents stranded in extracting/tables/…
     async with document_db_session() as (session, repo):
+        await _check_queue_schema(repo)
         await recover_stale(repo)
         await session.commit()
 
@@ -130,7 +164,9 @@ async def run_worker(
                     ):
                         try:
                             outcome = await run_worker_once(
-                                proc_repo, processor=processor
+                                proc_repo,
+                                processor=processor,
+                                commit=proc_session.commit,
                             )
                             await proc_session.commit()
                         except Exception:
@@ -200,6 +236,8 @@ def main() -> None:
                 try:
                     await run_worker(stop_event=stop_event)
                     break
+                except QueueSchemaError as exc:
+                    raise SystemExit(str(exc)) from exc
                 except Exception as exc:
                     if waited >= deadline or stop_event.is_set():
                         raise

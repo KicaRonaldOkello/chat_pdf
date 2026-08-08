@@ -46,7 +46,7 @@ async def readiness_error_for_documents(doc_ids: list[str]) -> str | None:
             detail = s.error or "unknown error"
             label = doc_label(s.filename, did)
             problems.append(f"{label}: processing failed ({detail})")
-        elif s.status != "ready":
+        elif s.status not in ("ready", "partial"):
             progress_pct = int(s.progress * 100)
             label = doc_label(s.filename, did)
             problems.append(f"{label}: not ready — {s.stage} ({progress_pct}%)")

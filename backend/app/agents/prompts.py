@@ -62,6 +62,11 @@ def get_router_prompt() -> str:
         "  * structural -- user refers to specific named sections/chapters/tables/figures\n"
         "  * semantic   -- user asks about content; vector search works best\n"
         "  * hybrid     -- both apply\n\n"
+        "IMPORTANT: the `route` field ONLY accepts exactly one of "
+        '"structural", "semantic", or "hybrid". Never put intent words '
+        'like "compare", "summary", or "trend" in `route` — put those in '
+        "`query_intent` (and, for multi-document comparisons, in "
+        "`multi_document_strategy`).\n\n"
         "When route is structural or hybrid, use namespaced section IDs: `document_id:local_section_id`\n\n"
         "QUERY REWRITING AND VARIANTS:\n"
         "- Rewrite the query to be more specific using document context\n"

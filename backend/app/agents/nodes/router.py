@@ -275,8 +275,31 @@ async def run(state: GraphState) -> dict[str, Any]:
             f"Route: {plan.route}, Variants: {len(plan.query_variants or [])}"
         )
     except Exception as e:
-        logger.log_error("Structured output failed, using fallback", e)
-        log.debug("router structured output failed; using fallback", exc_info=True)
+        logger.log_error("Structured output failed; retrying with correction", e)
+        log.debug("router structured output failed; retrying", exc_info=True)
+        try:
+            plan = await structured.ainvoke(
+                [
+                    SystemMessage(content=get_router_prompt()),
+                    HumanMessage(
+                        content=(
+                            "Your previous response did not validate. "
+                            "The `route` field must be exactly one of "
+                            '"structural", "semantic", or "hybrid" — do '
+                            'not use intent words such as "compare", '
+                            '"summary", or "trend" there. Put the intent in '
+                            "`query_intent` and, for cross-document "
+                            "comparisons, in `multi_document_strategy`. "
+                            "Re-answer the query with valid JSON only."
+                        )
+                    ),
+                ]
+            )
+        except Exception as e2:
+            logger.log_error("Structured output retry failed, using fallback", e2)
+            log.debug(
+                "router structured output retry failed; using fallback", exc_info=True
+            )
 
     if avoid_route and plan.route == avoid_route:
         logger.log_info(f"Switching from {avoid_route} to hybrid")

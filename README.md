@@ -292,6 +292,12 @@ The worker uses the same image with `entrypoint: ["python", "-m",
 config). On a new VPS, copy `docker-compose.prod.yml` and a filled `.env`
 into `~/chat-pdf-prod` (as the workflow expects).
 
+**Before running the worker locally**, apply the database migration
+(`alembic upgrade head`) — the worker depends on the queue columns
+(`attempts`, `next_attempt_at`, `claimed_until`) added by migration `0008`.
+If they are missing, the worker exits with a clear message instead of
+silently leaving documents stuck in `queued`.
+
 
 
 

@@ -11,12 +11,44 @@ import {
   PDF_MIN,
   STATUS_POLL_MS
 } from '../constants/const';
-import { ChatMessage, ChatStreamMeta, DocumentStatus, OpenDocument, RetrievedSource } from '../interfaces';
+import {
+  ChatMessage,
+  ChatStreamMeta,
+  DocumentProcessingStatus,
+  DocumentStatus,
+  OpenDocument,
+  RetrievedSource
+} from '../interfaces';
 import { ChatService } from './chat.service';
 import { LumenNotifyService } from './lumen-notify.service';
 
 @Injectable({ providedIn: 'root' })
 export class DocumentSessionService implements OnDestroy {
+  /** Statuses that never change again — polling stops for them. */
+  private static readonly TERMINAL_STATUSES = new Set<DocumentProcessingStatus>([
+    'ready',
+    'partial',
+    'error',
+    'failed',
+    'invalid',
+    'encrypted',
+    'resource_limit',
+    'parser_failure'
+  ]);
+
+  private static isTerminal(status: DocumentProcessingStatus | undefined): boolean {
+    return !!status && DocumentSessionService.TERMINAL_STATUSES.has(status);
+  }
+
+  private static isErrorStatus(status: DocumentProcessingStatus | undefined): boolean {
+    return (
+      !!status &&
+      status !== 'ready' &&
+      status !== 'partial' &&
+      DocumentSessionService.TERMINAL_STATUSES.has(status)
+    );
+  }
+
   onSessionChange?: () => void;
   private readonly chatService = inject(ChatService);
   private readonly notify = inject(LumenNotifyService);
@@ -80,34 +112,40 @@ export class DocumentSessionService implements OnDestroy {
 
   get docsInProgress(): OpenDocument[] {
     return this.openDocuments.filter(
-      (d) => d.status && d.status.status !== 'ready' && d.status.status !== 'error'
+      (d) => !DocumentSessionService.isTerminal(d.status?.status)
     );
   }
 
   get docsReadyList(): OpenDocument[] {
-    return this.openDocuments.filter((d) => d.status?.status === 'ready');
+    return this.openDocuments.filter(
+      (d) => d.status?.status === 'ready' || d.status?.status === 'partial'
+    );
   }
 
   get docsFailedList(): OpenDocument[] {
-    return this.openDocuments.filter((d) => d.status?.status === 'error');
+    return this.openDocuments.filter((d) =>
+      DocumentSessionService.isErrorStatus(d.status?.status)
+    );
   }
 
   get isDocumentReady(): boolean {
     if (this.openDocuments.length === 0) {
       return false;
     }
-    return this.openDocuments.every((d) => d.status?.status === 'ready');
+    return this.openDocuments.every(
+      (d) => d.status?.status === 'ready' || d.status?.status === 'partial'
+    );
   }
 
   get hasPendingInFlight(): boolean {
     return this.openDocuments.some(
-      (d) => d.status && d.status.status !== 'ready' && d.status.status !== 'error'
+      (d) => !DocumentSessionService.isTerminal(d.status?.status)
     );
   }
 
   get processingBannerText(): string {
     const pending = this.openDocuments.filter(
-      (d) => d.status && d.status.status !== 'ready' && d.status.status !== 'error'
+      (d) => !DocumentSessionService.isTerminal(d.status?.status)
     );
     if (pending.length) {
       if (pending.length > 1) {
@@ -117,7 +155,9 @@ export class DocumentSessionService implements OnDestroy {
       const pct = Math.round((s.progress ?? 0) * 100);
       return `Processing ${s.filename} - ${s.stage} (${pct}%)`;
     }
-    const err = this.openDocuments.find((d) => d.status?.status === 'error');
+    const err = this.openDocuments.find((d) =>
+      DocumentSessionService.isErrorStatus(d.status?.status)
+    );
     if (err?.status) {
       return `Processing failed: ${err.status.error ?? 'unknown error'}`;
     }
@@ -461,7 +501,7 @@ export class DocumentSessionService implements OnDestroy {
 
   private async runStreamingChat(text: string): Promise<void> {
     const ids = this.openDocuments
-      .filter((d) => d.status?.status === 'ready')
+      .filter((d) => d.status?.status === 'ready' || d.status?.status === 'partial')
       .map((d) => d.id);
     if (!ids.length) {
       return;
@@ -510,7 +550,7 @@ export class DocumentSessionService implements OnDestroy {
         return;
       }
       const toPoll = this.openDocuments.filter(
-        (d) => d.status == null || (d.status.status !== 'ready' && d.status.status !== 'error')
+        (d) => d.status == null || !DocumentSessionService.isTerminal(d.status.status)
       );
       if (toPoll.length === 0) {
         return;
@@ -533,11 +573,15 @@ export class DocumentSessionService implements OnDestroy {
           this.emitNewStatusWarnings();
           this.onSessionChange?.();
           const allDone = this.openDocuments.every(
-            (d) => d.status?.status === 'ready' || d.status?.status === 'error'
+            (d) => DocumentSessionService.isTerminal(d.status?.status)
           );
           if (allDone) {
             this.stopStatusPolling();
-            if (this.openDocuments.every((d) => d.status?.status === 'ready')) {
+            if (
+              this.openDocuments.every(
+                (d) => d.status?.status === 'ready' || d.status?.status === 'partial'
+              )
+            ) {
               this.notify.success('Documents ready. Ask anything.', 4000);
             }
             return;
