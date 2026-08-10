@@ -160,13 +160,15 @@
       }
       <div class="lumen-chat__field-wrap">
         <textarea
+          #composerField
           class="chat-input-card__field"
-          rows="3"
+          rows="1"
           [(ngModel)]="session.userInput"
           [disabled]="!session.documentId || session.sending || !session.isDocumentReady"
           [placeholder]="
             session.isDocumentReady ? 'Ask about your document(s)…' : 'Processing document(s)…'
           "
+          (input)="autoResize()"
           (keydown)="onComposerKeydown($event)"
         ></textarea>
         <button

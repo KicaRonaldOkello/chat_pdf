@@ -35,7 +35,13 @@ export type DocumentProcessingStatus =
   | 'enriching'
   | 'embedding'
   | 'ready'
-  | 'error';
+  | 'partial'
+  | 'error'
+  | 'failed'
+  | 'invalid'
+  | 'encrypted'
+  | 'resource_limit'
+  | 'parser_failure';
 
 export interface DocumentStatus {
   document_id: string;

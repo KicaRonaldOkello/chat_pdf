@@ -3,14 +3,13 @@ lazy reconstruction from the stored structure tree."""
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 import app.document_data as document_data
 from app.processing.structure import ElementRef, Section
 from app.processing.tree import deserialize, serialize, walk_sections
-
 
 # ---------------------------------------------------------------------------
 # ElementRef.from_dict
@@ -201,7 +200,12 @@ class TestTreeDeserialize:
         assert len(intro.elements) == 1
 
     def test_empty_sections(self):
-        tree_data = {"document_id": "d1", "filename": "f.pdf", "num_pages": 1, "sections": []}
+        tree_data = {
+            "document_id": "d1",
+            "filename": "f.pdf",
+            "num_pages": 1,
+            "sections": [],
+        }
         root = deserialize(tree_data)
         assert walk_sections(root) == []
 
@@ -224,7 +228,9 @@ class TestHeuristicBuildSectionsIndex:
                 page_range=[1, 2],
                 elements=[
                     ElementRef(
-                        id="el-1", type="text", page=1,
+                        id="el-1",
+                        type="text",
+                        page=1,
                         text="This is the first sentence. And the second.",
                     ),
                     ElementRef(id="el-2", type="image", page=2, text=""),
@@ -238,7 +244,10 @@ class TestHeuristicBuildSectionsIndex:
                 page_range=[3, 5],
                 elements=[
                     ElementRef(
-                        id="el-3", type="table", page=3, text="",
+                        id="el-3",
+                        type="table",
+                        page=3,
+                        text="",
                         extra={"html": "<table>...</table>"},
                     ),
                 ],
@@ -306,7 +315,9 @@ class TestHeuristicBuildDocumentMeta:
     def test_shape(self):
         from app.processing.metadata import heuristic_build_document_meta
 
-        root = Section(id="sec-root", title="(root)", level=0, path="", page_range=[1, 5])
+        root = Section(
+            id="sec-root", title="(root)", level=0, path="", page_range=[1, 5]
+        )
         root.children = [
             Section(
                 id="sec-1",
@@ -315,8 +326,20 @@ class TestHeuristicBuildDocumentMeta:
                 path="Intro",
                 page_range=[1, 2],
                 elements=[
-                    ElementRef(id="el-1", type="image", page=1, text="", extra={"caption": "Fig 1"}),
-                    ElementRef(id="el-2", type="table", page=2, text="", extra={"html": "<table>..."}),
+                    ElementRef(
+                        id="el-1",
+                        type="image",
+                        page=1,
+                        text="",
+                        extra={"caption": "Fig 1"},
+                    ),
+                    ElementRef(
+                        id="el-2",
+                        type="table",
+                        page=2,
+                        text="",
+                        extra={"html": "<table>..."},
+                    ),
                 ],
             ),
         ]
@@ -337,6 +360,38 @@ class TestHeuristicBuildDocumentMeta:
         assert len(meta["figure_index"]) == 1
         assert meta["figure_index"][0]["caption"] == "Fig 1"
         assert len(meta["table_index"]) == 1
+        assert meta["visual_pages"] == [1]
+
+    def test_visual_pages_includes_vector_visual_elements(self):
+        from app.processing.metadata import heuristic_build_document_meta
+
+        root = Section(
+            id="sec-root", title="(root)", level=0, path="", page_range=[1, 2]
+        )
+        root.children = [
+            Section(
+                id="sec-1",
+                title="Charts",
+                level=1,
+                path="Charts",
+                page_range=[1, 2],
+                elements=[
+                    ElementRef(
+                        id="el-v",
+                        type="image",
+                        page=2,
+                        text="",
+                        extra={"vector_visual": True},
+                    )
+                ],
+            ),
+        ]
+
+        meta = heuristic_build_document_meta(
+            root, document_id="d2", filename="charts.pdf", num_pages=2
+        )
+
+        assert meta["visual_pages"] == [2]
 
 
 # ---------------------------------------------------------------------------

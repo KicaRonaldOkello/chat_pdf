@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import * as pdfjsLib from 'pdfjs-dist';
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist';
 
-import { ensurePdfWorker } from '../pdfjs-worker';
+import { createPdfWorker } from '../pdfjs-worker';
 import { PDF_PDFJS_VERSION } from '../const';
 import type { DocumentLoaderState } from '../interfaces/pdf-viewer.types';
 
@@ -121,7 +121,9 @@ export class PdfDocumentLoader {
       // pdf.js may transfer `data` to the worker thread and detach the buffer.
       // Always pass a copy so the session-stored ArrayBuffer remains reusable.
       const data = sourceData.slice(0);
-      ensurePdfWorker();
+      // One worker per document: see createPdfWorker() for why reusing a
+      // shared worker port across loads breaks under rapid document swaps.
+      pdfjsLib.GlobalWorkerOptions.workerPort = createPdfWorker();
       const loadingTask = pdfjsLib.getDocument({
         data,
         cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDF_PDFJS_VERSION}/cmaps/`,

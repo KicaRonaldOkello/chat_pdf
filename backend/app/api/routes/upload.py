@@ -6,7 +6,6 @@ from typing import Any
 
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     Depends,
     File,
     HTTPException,
@@ -19,7 +18,7 @@ from app import document_data
 from app.api.schemas import UploadResponse
 from app.auth.google_auth import require_session_token
 from app.db.repositories import UserDocumentRepository
-from app.processing.pipeline import process_document
+from app.processing.validation import validate_pdf_bytes
 from app.settings import settings
 
 router = APIRouter(prefix="/api", tags=["upload"])
@@ -56,7 +55,6 @@ async def _record_user_upload(
 @router.post("/upload", response_model=UploadResponse)
 async def upload_pdf(
     request: Request,
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     claims: dict[str, Any] = Depends(require_session_token),
 ) -> UploadResponse:
@@ -71,10 +69,20 @@ async def upload_pdf(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"PDF must be at most {mb} MB",
         )
+    inspection = validate_pdf_bytes(data)
+    if not inspection.is_pdf:
+        raise HTTPException(
+            status_code=400,
+            detail="File is not a valid PDF (missing %PDF header)",
+        )
+    if not inspection.readable:
+        raise HTTPException(
+            status_code=400,
+            detail="File could not be read as a PDF; it may be corrupt",
+        )
 
     doc_id = await document_data.save_upload_and_record(data, file.filename)
     await _record_user_upload(request, claims, doc_id, file.filename, len(data))
-    background_tasks.add_task(process_document, doc_id)
     return UploadResponse(
         document_id=doc_id, status="processing", filename=file.filename
     )

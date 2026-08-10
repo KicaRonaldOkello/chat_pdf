@@ -22,10 +22,11 @@ from app.db.repositories.document_state import (
     DocumentStatus,
 )
 from app.processing.metadata import (
-    heuristic_build_sections_index,
     heuristic_build_document_meta,
+    heuristic_build_sections_index,
 )
-from app.processing.tree import deserialize as _deserialize_tree, walk_sections
+from app.processing.tree import deserialize as _deserialize_tree
+from app.processing.tree import walk_sections
 from app.runtime import get_db_session_maker
 from app.storage import get_storage
 
@@ -54,9 +55,9 @@ __all__ = [
 
 
 @asynccontextmanager
-async def document_db_session() -> AsyncIterator[
-    tuple[AsyncSession, DocumentStateRepository]
-]:
+async def document_db_session() -> (
+    AsyncIterator[tuple[AsyncSession, DocumentStateRepository]]
+):
     sm = get_db_session_maker()
     if sm is None:
         raise RuntimeError("DATABASE_URL is not configured")
@@ -79,9 +80,7 @@ async def set_status(document_id: str, st: DocumentStatus) -> None:
         await session.commit()
 
 
-async def update_status(
-    document_id: str, **kwargs: Any
-) -> DocumentStatus:
+async def update_status(document_id: str, **kwargs: Any) -> DocumentStatus:
     async with document_db_session() as (session, repo):
         new = await repo.update_status(document_id, **kwargs)
         await session.commit()
@@ -103,9 +102,7 @@ async def get_tree(document_id: str) -> dict[str, Any] | None:
         return await repo.get_tree(document_id)
 
 
-async def save_sections_index(
-    document_id: str, entries: list[dict[str, Any]]
-) -> None:
+async def save_sections_index(document_id: str, entries: list[dict[str, Any]]) -> None:
     async with document_db_session() as (session, repo):
         await repo.save_sections_index(document_id, entries)
         await session.commit()
@@ -126,7 +123,7 @@ async def get_sections_index(
         # ── fallback: reconstruct from the stored structure tree ──────────
         try:
             status = await repo.get_status(document_id)
-            if status is None or status.status != "ready":
+            if status is None or status.status not in ("ready", "partial"):
                 return None
 
             tree_data = await repo.get_tree(document_id)
@@ -155,9 +152,7 @@ async def get_sections_index(
             return None
 
 
-async def save_document_meta(
-    document_id: str, meta: dict[str, Any]
-) -> None:
+async def save_document_meta(document_id: str, meta: dict[str, Any]) -> None:
     async with document_db_session() as (session, repo):
         await repo.save_document_meta(document_id, meta)
         await session.commit()
@@ -178,7 +173,7 @@ async def get_document_meta(
         # ── fallback: reconstruct from the stored structure tree ──────────
         try:
             status = await repo.get_status(document_id)
-            if status is None or status.status != "ready":
+            if status is None or status.status not in ("ready", "partial"):
                 return None
 
             tree_data = await repo.get_tree(document_id)
@@ -194,9 +189,7 @@ async def get_document_meta(
             )
             await repo.save_document_meta(document_id, reconstructed)
             await session.commit()
-            log.info(
-                "reconstructed document_meta from tree for %s", document_id
-            )
+            log.info("reconstructed document_meta from tree for %s", document_id)
             return reconstructed
         except Exception:
             log.exception(
@@ -205,17 +198,13 @@ async def get_document_meta(
             return None
 
 
-async def append_trace(
-    document_id: str, trace: dict[str, Any]
-) -> None:
+async def append_trace(document_id: str, trace: dict[str, Any]) -> None:
     async with document_db_session() as (session, repo):
         await repo.append_trace(document_id, trace)
         await session.commit()
 
 
-async def list_traces(
-    document_id: str, limit: int = 20
-) -> list[dict[str, Any]]:
+async def list_traces(document_id: str, limit: int = 20) -> list[dict[str, Any]]:
     sm = get_db_session_maker()
     if sm is None:
         return []
@@ -253,9 +242,7 @@ def release_source_temp_path(path: Path) -> None:
         pass
 
 
-async def save_upload_and_record(
-    data: bytes, filename: str
-) -> str:
+async def save_upload_and_record(data: bytes, filename: str) -> str:
     document_id = str(uuid.uuid4())
     get_storage().put_source_pdf_bytes(document_id, data)
     st = DocumentStatus(

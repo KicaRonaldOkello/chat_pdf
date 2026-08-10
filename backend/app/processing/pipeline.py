@@ -3,46 +3,55 @@ from __future__ import annotations
 import asyncio
 import logging
 import traceback
+from dataclasses import dataclass
 
 from app import document_data
 from app.db.repositories.document_state import DocumentStatus
 from app.processing import (
     chunking,
+    concurrency,
     embeddings,
     images,
     metadata,
+    preflight,
     structure,
     tables,
     tree,
     vectorstore,
 )
+from app.processing.preflight import PreflightError
 from app.processing.structure import Section
+from app.settings import settings
 from app.storage import get_storage
 
 log = logging.getLogger(__name__)
 
-
-_background_tasks: set[asyncio.Task[None]] = set()
-
-
-def spawn_background(coro) -> None:
-    task = asyncio.create_task(coro)
-    _background_tasks.add(task)
-    task.add_done_callback(_background_tasks.discard)
+RETRYABLE_STATUSES = frozenset({"parser_failure", "resource_limit"})
 
 
-async def process_document(doc_id: str) -> None:
+@dataclass
+class RunOutcome:
+    """Result of one processing attempt, for the worker's retry decision."""
+
+    status: str
+    retryable: bool
+    error: str | None = None
+
+
+async def process_document(doc_id: str, run_attempt: int = 1) -> RunOutcome:
     # Captured during the main pipeline; consumed by enrichment after the
     # document is marked ready.
     _enrich_root: Section | None = None
     _enrich_filename: str = ""
     _enrich_num_pages: int = 0
+    final_status = "parser_failure"
+    final_error: str | None = None
 
     async with document_data.document_db_session() as (session, repo):
         status = await repo.get_status(doc_id)
         if status is None:
-            log.error("process_document: unknown doc_id %s", doc_id)
-            return
+            log.warning("process_document: unknown doc_id %s", doc_id)
+            return RunOutcome(status="unknown", retryable=False)
 
         _enrich_filename = status.filename
 
@@ -54,11 +63,13 @@ async def process_document(doc_id: str) -> None:
             log.exception(
                 "process_document: could not load source PDF for %s: %s", doc_id, e
             )
+            final_status = "parser_failure"
+            final_error = str(e)
             try:
                 await repo.set_status(
                     doc_id,
                     DocumentStatus(
-                        status="error",
+                        status="parser_failure",
                         stage="failed to load source PDF",
                         progress=0.0,
                         filename=status.filename,
@@ -68,117 +79,186 @@ async def process_document(doc_id: str) -> None:
                 await session.commit()
             except Exception:  # pragma: no cover
                 pass
-            return
+            return RunOutcome(
+                status=final_status,
+                retryable=final_status in RETRYABLE_STATUSES,
+                error=final_error,
+            )
 
         try:
-            await repo.update_status(
-                doc_id,
-                status="extracting",
-                stage="parsing document structure",
-                progress=0.05,
-            )
-            await session.commit()
-            root, elements, num_pages, part_warnings = await asyncio.to_thread(
-                structure.partition, pdf
-            )
-            _enrich_root = root
-            _enrich_num_pages = num_pages
-            await repo.update_status(
-                doc_id,
-                num_pages=num_pages,
-                progress=0.25,
-                warnings=part_warnings or None,
-            )
-            await session.commit()
-
-            await repo.update_status(
-                doc_id, status="tables", stage="extracting tables", progress=0.35
-            )
-            await session.commit()
-            await tables.enrich_tables(pdf, root, elements)
-
-            await repo.update_status(
-                doc_id, status="images", stage="captioning figures", progress=0.55
-            )
-            await session.commit()
-            await images.enrich_images(pdf, doc_id, elements, root, len(elements))
-
-            await repo.update_status(doc_id, stage="writing tree", progress=0.70)
-            await session.commit()
-            tree_json = tree.serialize(
-                root, document_id=doc_id, filename=status.filename, num_pages=num_pages
-            )
-            await repo.save_tree(doc_id, tree_json)
-            await session.commit()
-            get_storage().put_debug_json(doc_id, "structure_tree", tree_json)
-
-            await repo.update_status(
-                doc_id,
-                status="embedding",
-                stage="chunking and embedding",
-                progress=0.85,
-            )
-            await session.commit()
-            chunks = chunking.build_chunks(root, doc_id)
-            get_storage().put_debug_json(
-                doc_id,
-                "chunks",
-                [
-                    {
-                        "chunk_id": c.chunk_id,
-                        "type": c.type,
-                        "page": c.page,
-                        "section_path": c.section_path,
-                        "text_for_embedding": c.text_for_embedding,
-                        "display_text": c.display_text,
-                        "bbox": c.bbox,
-                        "page_size": c.page_size,
-                        "extra": c.extra,
-                    }
-                    for c in chunks
-                ]
-            )
-            if chunks:
-                await vectorstore.delete_doc(doc_id, session=session)
-                vectors = await embeddings.embed_texts(
-                    [c.text_for_embedding for c in chunks]
+            async with asyncio.timeout(settings.processing_timeout_seconds):
+                await repo.update_status(
+                    doc_id,
+                    status="extracting",
+                    stage=f"classifying document (attempt {run_attempt})",
+                    progress=0.05,
                 )
-                await vectorstore.upsert_chunks(chunks, vectors, session=session)
+                await session.commit()
+                async with concurrency.parse_semaphore():
+                    preflight_result = await asyncio.to_thread(
+                        preflight.classify_pdf, pdf
+                    )
+                get_storage().put_debug_json(
+                    doc_id, "preflight", preflight_result.to_dict()
+                )
+                async with concurrency.parse_semaphore():
+                    root, elements, num_pages, part_warnings = await asyncio.to_thread(
+                        structure.partition, pdf, preflight=preflight_result
+                    )
+                _enrich_root = root
+                _enrich_num_pages = num_pages
+                await repo.update_status(
+                    doc_id,
+                    num_pages=num_pages,
+                    stage=f"parsing document structure via {preflight_result.route}",
+                    progress=0.25,
+                    warnings=part_warnings or None,
+                )
+                await session.commit()
 
-            await repo.update_status(
-                doc_id, status="ready", stage="ready", progress=1.0
+                await repo.update_status(
+                    doc_id, status="tables", stage="extracting tables", progress=0.35
+                )
+                await session.commit()
+                async with concurrency.parse_semaphore():
+                    table_diag = await tables.enrich_tables(pdf, root, elements)
+                get_storage().put_debug_json(
+                    doc_id, "table_diagnostics", table_diag.to_dict()
+                )
+                if table_diag.errors:
+                    part_warnings = [
+                        f"table extraction: {err}" for err in table_diag.errors
+                    ] + (part_warnings or [])
+                await repo.update_status(doc_id, warnings=part_warnings or None)
+                await session.commit()
+
+                await repo.update_status(
+                    doc_id, status="images", stage="extracting figures", progress=0.55
+                )
+                await session.commit()
+                await images.enrich_images(pdf, doc_id, elements, root, len(elements))
+
+                await repo.update_status(doc_id, stage="writing tree", progress=0.70)
+                await session.commit()
+                tree_json = tree.serialize(
+                    root,
+                    document_id=doc_id,
+                    filename=status.filename,
+                    num_pages=num_pages,
+                )
+                await repo.save_tree(doc_id, tree_json)
+                await session.commit()
+                get_storage().put_debug_json(doc_id, "structure_tree", tree_json)
+
+                await repo.update_status(
+                    doc_id,
+                    status="embedding",
+                    stage="chunking and embedding",
+                    progress=0.85,
+                )
+                await session.commit()
+                chunks = chunking.build_chunks(root, doc_id)
+                get_storage().put_debug_json(
+                    doc_id,
+                    "chunks",
+                    [
+                        {
+                            "chunk_id": c.chunk_id,
+                            "type": c.type,
+                            "page": c.page,
+                            "section_path": c.section_path,
+                            "text_for_embedding": c.text_for_embedding,
+                            "display_text": c.display_text,
+                            "bbox": c.bbox,
+                            "page_size": c.page_size,
+                            "extra": c.extra,
+                        }
+                        for c in chunks
+                    ],
+                )
+                if chunks:
+                    await vectorstore.delete_doc(doc_id, session=session)
+                    async with concurrency.embedding_semaphore():
+                        vectors = await embeddings.embed_texts(
+                            [c.text_for_embedding for c in chunks]
+                        )
+                    await vectorstore.upsert_chunks(chunks, vectors, session=session)
+
+                final_status = "partial" if part_warnings else "ready"
+                await repo.update_status(
+                    doc_id, status=final_status, stage="ready", progress=1.0
+                )
+                await session.commit()
+        except TimeoutError:
+            log.error("process_document timed out for %s", doc_id)
+            final_status = "resource_limit"
+            final_error = (
+                f"Processing timed out after {settings.processing_timeout_seconds}s"
             )
-            await session.commit()
-        except Exception as e:
-            log.exception("process_document failed for %s", doc_id)
             try:
                 await repo.update_status(
                     doc_id,
-                    status="error",
-                    stage="error",
+                    status="resource_limit",
+                    stage=(
+                        f"processing exceeded "
+                        f"{settings.processing_timeout_seconds}s limit"
+                    ),
                     progress=1.0,
-                    error=f"{type(e).__name__}: {e}\n{traceback.format_exc(limit=3)}",
+                    error=final_error,
+                )
+                await session.commit()
+            except Exception:  # pragma: no cover
+                pass
+        except PreflightError as e:
+            log.warning("preflight rejected %s: [%s] %s", doc_id, e.status, e.message)
+            final_status = e.status
+            final_error = f"{type(e).__name__}: {e}"
+            try:
+                await repo.update_status(
+                    doc_id,
+                    status=e.status,
+                    stage=e.message,
+                    progress=1.0,
+                    error=final_error,
+                )
+                await session.commit()
+            except Exception:  # pragma: no cover
+                pass
+        except Exception as e:
+            log.exception("process_document failed for %s", doc_id)
+            final_status = "parser_failure"
+            final_error = f"{type(e).__name__}: {e}\n{traceback.format_exc(limit=3)}"
+            try:
+                await repo.update_status(
+                    doc_id,
+                    status="parser_failure",
+                    stage="parser failure",
+                    progress=1.0,
+                    error=final_error,
                 )
                 await session.commit()
             except Exception:  # pragma: no cover
                 pass
         finally:
-            await asyncio.to_thread(
-                document_data.release_source_temp_path, pdf
-            )
+            await asyncio.to_thread(document_data.release_source_temp_path, pdf)
+
+    outcome = RunOutcome(
+        status=final_status,
+        retryable=final_status in RETRYABLE_STATUSES,
+        error=final_error,
+    )
 
     # Enrichment runs *after* the document is ready so that chunk retrieval
     # works immediately.  Failures here are non-fatal — the document is
     # already queryable; only metadata quality is degraded.
-    if _enrich_root is not None:
+    if _enrich_root is not None and final_status in ("ready", "partial"):
         try:
             await enrich_in_background(
                 doc_id, _enrich_root, _enrich_filename, _enrich_num_pages
             )
         except Exception:
-            log.exception(
-                "enrichment failed for %s (document is still ready)", doc_id
-            )
+            log.exception("enrichment failed for %s (document is still ready)", doc_id)
+    return outcome
 
 
 async def enrich_in_background(

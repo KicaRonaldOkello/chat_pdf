@@ -18,6 +18,13 @@ from app.processing.tree import walk_sections
 from app.settings import settings
 from app.storage import get_storage
 
+#: A page whose vector drawing bounds cover at least this fraction of the
+#: page is treated as a visual candidate (charts, line art, diagrams) even
+#: when it has no raster images.
+VECTOR_VISUAL_COVERAGE_MIN = 0.10
+#: Minimum number of vector drawing objects before a page is flagged.
+VECTOR_VISUAL_DRAWINGS_MIN = 3
+
 CAPTION_PROMPT = (
     "Describe this figure from an uploaded document for a retrieval index. "
     "Return STRICT JSON with two keys:\n"
@@ -129,9 +136,49 @@ def render_images(
     return results
 
 
-def render_page_image(
-    doc_id: str, page: int, *, dpi: int = 200
-) -> bytes:
+def detect_vector_visual_pages(
+    pdf_file: Path,
+    *,
+    min_coverage: float = VECTOR_VISUAL_COVERAGE_MIN,
+    min_drawings: int = VECTOR_VISUAL_DRAWINGS_MIN,
+) -> list[int]:
+    """Return 1-based pages with substantial vector drawing coverage.
+
+    Vector charts (Matplotlib, Excel, PPTX exports) have no raster image
+    objects, so ``render_images`` never sees them.  PyMuPDF's drawing
+    operators still describe the chart strokes, which lets us mark the page
+    as a visual candidate for query-time vision.
+    """
+    import fitz
+
+    pages: list[int] = []
+    try:
+        doc = fitz.open(str(pdf_file))
+    except Exception as exc:
+        log.warning("vector page detection failed for %s: %s", pdf_file, exc)
+        return pages
+    try:
+        for page_num, page in enumerate(doc, start=1):
+            try:
+                drawings = page.get_drawings()
+            except Exception:
+                continue
+            if len(drawings) < min_drawings:
+                continue
+            page_area = max(1e-6, float(page.rect.width * page.rect.height))
+            covered = 0.0
+            for d in drawings:
+                r = d.get("rect")
+                if r is not None:
+                    covered += abs(float(r.width * r.height))
+            if covered / page_area >= min_coverage:
+                pages.append(page_num)
+    finally:
+        doc.close()
+    return pages
+
+
+def render_page_image(doc_id: str, page: int, *, dpi: int = 200) -> bytes:
     """Render a full PDF page as a PNG image.
 
     Pulls the source PDF from storage, renders *page* (1-based) with
@@ -173,9 +220,7 @@ async def analyze_page_for_query(
         return None
 
     try:
-        png_bytes = await asyncio.to_thread(
-            render_page_image, doc_id, page, dpi=dpi
-        )
+        png_bytes = await asyncio.to_thread(render_page_image, doc_id, page, dpi=dpi)
     except Exception as e:
         log.warning(f"Failed to render page {page} for doc {doc_id}: {e}")
         return None
@@ -349,41 +394,66 @@ async def enrich_images(
     with tempfile.TemporaryDirectory(prefix="chatpdf-img-") as tmp:
         out_dir = Path(tmp)
         figs = await asyncio.to_thread(render_images, pdf_file, out_dir)
+        vector_pages = await asyncio.to_thread(detect_vector_visual_pages, pdf_file)
+    pairings: list[tuple[ElementRef, dict[str, Any]]] = []
     if not figs:
         for image_placeholder in [p for p in placeholders if p.type == "image"]:
             image_placeholder.extra.setdefault("path", "")
             image_placeholder.extra.setdefault("caption", image_placeholder.text)
             image_placeholder.extra.setdefault("description", "")
-        return
 
-    for fig in figs:
-        key = get_storage().put_image_bytes(
-            document_id, fig["rel_name"], fig["png_bytes"]
-        )
-        fig["storage_key"] = key
+    if figs:
+        for fig in figs:
+            key = get_storage().put_image_bytes(
+                document_id, fig["rel_name"], fig["png_bytes"]
+            )
+            fig["storage_key"] = key
 
-    image_placeholders = [p for p in placeholders if p.type == "image"]
-    used_ids: set[str] = set()
-    pairings: list[tuple[ElementRef, dict[str, Any]]] = []
+        image_placeholders = [p for p in placeholders if p.type == "image"]
+        used_ids: set[str] = set()
 
-    for fig in figs:
-        ph = match_image(fig, image_placeholders, used_ids)
-        if ph is None:
+        for fig in figs:
+            ph = match_image(fig, image_placeholders, used_ids)
+            if ph is None:
+                el_id_start += 1
+                ph = ElementRef(
+                    id=f"el-{el_id_start}",
+                    type="image",
+                    page=fig["page"],
+                    text="",
+                    bbox=fig["bbox"],
+                    page_size=fig.get("page_size"),
+                )
+                sec = find_section_for_page(root, fig["page"])
+                sec.elements.append(ph)
+                placeholders.append(ph)
+            used_ids.add(ph.id)
+            ph.extra["path"] = str(fig.get("storage_key", ""))
+            pairings.append((ph, fig))
+
+    # Vector-only visual pages (charts/diagrams with no raster image) become
+    # image placeholders so retrieval can nominate them for query-time vision.
+    if vector_pages:
+        existing_image_pages = {
+            el.page
+            for el in placeholders
+            if el.type == "image" and el.page in vector_pages
+        }
+        for page in vector_pages:
+            if page in existing_image_pages:
+                continue
             el_id_start += 1
             ph = ElementRef(
                 id=f"el-{el_id_start}",
                 type="image",
-                page=fig["page"],
+                page=page,
                 text="",
-                bbox=fig["bbox"],
-                page_size=fig.get("page_size"),
+                extra={"vector_visual": True},
             )
-            sec = find_section_for_page(root, fig["page"])
+            sec = find_section_for_page(root, page)
             sec.elements.append(ph)
             placeholders.append(ph)
-        used_ids.add(ph.id)
-        ph.extra["path"] = str(fig.get("storage_key", ""))
-        pairings.append((ph, fig))
+            pairings.append((ph, {"page": page, "vector_visual": True}))
 
     # Record image metadata without calling the vision model.
     # Vision analysis is deferred to query time (Phase D-G).
@@ -402,6 +472,8 @@ async def enrich_images(
         ph.extra.setdefault("caption", ph.text)
         ph.extra.setdefault("description", "")
         ph.extra["vision_analyzed"] = False
+        if ph.extra.get("vector_visual"):
+            ph.extra.setdefault("nearby_text", "")
         nearby = _page_text_cache.get(ph.page, "")
         if nearby:
             ph.extra["nearby_text"] = nearby.strip()

@@ -15,20 +15,28 @@ from app.processing.structure import Section
 from app.processing.tree import walk_sections
 from app.settings import settings
 
-TOKEN_ENC = tiktoken.get_encoding("cl100k_base")
+_TOKEN_ENC: tiktoken.Encoding | None = None
+
+
+def _get_token_enc() -> tiktoken.Encoding:
+    global _TOKEN_ENC
+    if _TOKEN_ENC is None:
+        _TOKEN_ENC = tiktoken.get_encoding("cl100k_base")
+    return _TOKEN_ENC
 
 
 def count_tokens(text: str) -> int:
-    return len(TOKEN_ENC.encode(text, disallowed_special=()))
+    return len(_get_token_enc().encode(text, disallowed_special=()))
 
 
 def truncate_to_max_tokens(text: str, max_tokens: int) -> str:
     if max_tokens <= 0:
         return ""
-    ids = TOKEN_ENC.encode(text, disallowed_special=())
+    enc = _get_token_enc()
+    ids = enc.encode(text, disallowed_special=())
     if len(ids) <= max_tokens:
         return text
-    return TOKEN_ENC.decode(ids[:max_tokens])
+    return enc.decode(ids[:max_tokens])
 
 
 def section_body_text_limited_by_tokens(section: Section, max_tokens: int) -> str:
@@ -290,11 +298,11 @@ async def enrich_batch(
             if not sid:
                 continue
             summary = str(item.get("summary", "")).strip()[
-                :settings.metadata_ollama_batch_section_summary_max
+                : settings.metadata_ollama_batch_section_summary_max
             ]
             kws_raw = item.get("keywords") or []
             keywords = [str(k).strip() for k in kws_raw if str(k).strip()][
-                :settings.metadata_ollama_batch_keywords_max
+                : settings.metadata_ollama_batch_keywords_max
             ]
             if summary or keywords:
                 out[sid] = SectionEnrichment(summary=summary, keywords=keywords)
@@ -603,6 +611,15 @@ def assemble_document_meta(
     num_pages: int,
 ) -> dict[str, Any]:
     figures, tables = collect_figure_table_index(root)
+    visual_pages = sorted(
+        {int(fig["page"]) for fig in figures if int(fig["page"]) > 0}
+        | {
+            el.page
+            for section in walk_sections(root)
+            for el in section.elements
+            if el.type == "image" and el.extra.get("vector_visual")
+        }
+    )
     return {
         "document_id": document_id,
         "filename": filename,
@@ -618,6 +635,7 @@ def assemble_document_meta(
         "abstract": str(inferred.get("abstract") or "").strip()[:500],
         "figure_index": figures,
         "table_index": tables,
+        "visual_pages": visual_pages,
         "num_sections": len(walk_sections(root)),
     }
 
@@ -676,10 +694,10 @@ def merge_section_response(
         if not sid:
             continue
         summary = str(item.get("summary", "")).strip()[
-            :settings.metadata_openrouter_parsed_section_summary_max
+            : settings.metadata_openrouter_parsed_section_summary_max
         ]
         kws = [str(k).strip() for k in (item.get("keywords") or []) if str(k).strip()][
-            :settings.metadata_openrouter_parsed_keywords_max
+            : settings.metadata_openrouter_parsed_keywords_max
         ]
         by_id[sid] = SectionEnrichment(summary=summary, keywords=kws)
 

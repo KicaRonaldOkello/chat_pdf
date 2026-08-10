@@ -1,19 +1,18 @@
 import * as pdfjsLib from 'pdfjs-dist';
 
-let configured = false;
-
 /**
- * Binds PDF.js to a real module Worker whose script URL is emitted by the bundler
- * (`new URL(..., import.meta.url)`), avoiding fragile `/assets/pdf.worker.min.mjs` fetches
- * and the fake-worker `import()` path that breaks under `ng serve`.
+ * Create a fresh PDF.js worker port whose script URL is emitted by the
+ * bundler (`new URL(..., import.meta.url)`).
+ *
+ * A new port is created for every document load on purpose: pdf.js marks a
+ * worker port as `_pendingDestroy` when a loading task is destroyed, and a
+ * subsequent load reusing the same port throws
+ * "PDFWorker.fromPort - the worker is being destroyed". A fresh worker per
+ * document avoids that race entirely (the worker is terminated with the
+ * document when it is destroyed).
  */
-export function ensurePdfWorker(): void {
-  if (configured) {
-    return;
-  }
-  configured = true;
-
-  pdfjsLib.GlobalWorkerOptions.workerPort = new Worker(
+export function createPdfWorker(): Worker {
+  return new Worker(
     new URL('../../../node_modules/pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url),
     { type: 'module' }
   );

@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import random
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from app.processing.concurrency import table_semaphore
 from app.processing.structure import ElementRef, Section
 from app.settings import settings
+
+log = logging.getLogger(__name__)
 
 DESCRIBE_PROMPT = (
     "You are writing a search-index entry for a table. Your output will be "
@@ -37,6 +43,30 @@ DESCRIBE_PROMPT = (
 TABLE_DESCRIBE_PREVIEW_ROWS = 5  # first + last N rows sent to the describer
 
 
+@dataclass
+class TableDiagnostics:
+    """Observability for one table-extraction pass."""
+
+    total_pages: int = 0
+    pages_detected: list[int] = field(default_factory=list)
+    pages_skipped: list[int] = field(default_factory=list)
+    lattice_pages: list[int] = field(default_factory=list)
+    stream_pages: list[int] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    tables_extracted: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "total_pages": self.total_pages,
+            "pages_detected": self.pages_detected,
+            "pages_skipped": self.pages_skipped,
+            "lattice_pages": self.lattice_pages,
+            "stream_pages": self.stream_pages,
+            "errors": self.errors,
+            "tables_extracted": self.tables_extracted,
+        }
+
+
 def _build_describe_snippet(markdown: str, page_range: list[int] | None = None) -> str:
     """Build a compact markdown preview for the table description LLM.
 
@@ -59,8 +89,8 @@ def _build_describe_snippet(markdown: str, page_range: list[int] | None = None) 
         # Small enough — send everything
         return "\n".join(header) + markdown
 
-    head = lines[: 2 + n]           # header + sep + first N data rows
-    tail = lines[-n:]                # last N data rows
+    head = lines[: 2 + n]  # header + sep + first N data rows
+    tail = lines[-n:]  # last N data rows
     return "\n".join(header) + "\n".join(head) + "\n...\n" + "\n".join(tail)
 
 
@@ -99,9 +129,7 @@ def _collapse_headers(lines: list[str]) -> list[str]:
     header_rows: list[list[str]] = []
     for i in range(sep_idx):
         if lines[i].startswith("|"):
-            header_rows.append(
-                [c.strip() for c in lines[i].split("|")[1:-1]]
-            )
+            header_rows.append([c.strip() for c in lines[i].split("|")[1:-1]])
 
     # … and header-continuation rows after the separator, up to (but not
     # including) the first *data* row.  Data cells look like "4 288"
@@ -110,9 +138,7 @@ def _collapse_headers(lines: list[str]) -> list[str]:
     # never more than 1-2 per row.
     import re
 
-    _data_cell = re.compile(
-        r"^\s*(?:\d{1,3}(?:\s\d{3})+|\d+\.\d+|[.]{2,})\s*$"
-    )
+    _data_cell = re.compile(r"^\s*(?:\d{1,3}(?:\s\d{3})+|\d+\.\d+|[.]{2,})\s*$")
     first_data: int = sep_idx + 1
     for i in range(sep_idx + 1, len(lines)):
         if not lines[i].startswith("|"):
@@ -344,15 +370,94 @@ def _merge_consecutive(
     return merged
 
 
-def extract_tables(pdf_file: Path) -> list[dict[str, Any]]:
+def detect_table_pages(pdf_file: Path) -> tuple[list[int], TableDiagnostics]:
+    """Heuristically find pages that are likely to contain tables.
+
+    Uses cheap pypdf text extraction (no rendering, no Camelot) to look for
+    tabular structure: pipe-separated rows, repeated tab runs, or numeric
+    multi-column lines.  Pages without any signal are skipped by Camelot,
+    which avoids the expensive two-pass extraction on clearly non-table
+    documents.
+    """
+    import pypdf
+
+    diagnostics = TableDiagnostics()
+    detected: list[int] = []
+    try:
+        reader = pypdf.PdfReader(str(pdf_file), strict=False)
+        diagnostics.total_pages = len(reader.pages)
+        for page_no, page in enumerate(reader.pages, start=1):
+            text = page.extract_text() or ""
+            lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+            if not lines:
+                continue
+            pipe_lines = sum(
+                1
+                for ln in lines
+                if "|" in ln and len(ln) >= settings.table_page_line_min_len
+            )
+            numeric_lines = 0
+            tab_lines = 0
+            for ln in lines:
+                if "\t" in ln:
+                    tab_lines += 1
+                elif len(ln) >= settings.table_page_line_min_len:
+                    cells = [c for c in ln.split("  ") if c.strip()]
+                    numeric = sum(1 for c in cells if any(ch.isdigit() for ch in c))
+                    if len(cells) >= 3 and numeric >= 2:
+                        numeric_lines += 1
+            if (
+                pipe_lines >= settings.table_page_pipe_min_lines
+                or tab_lines >= settings.table_page_pipe_min_lines
+                or numeric_lines >= settings.table_page_numeric_min_lines
+            ):
+                detected.append(page_no)
+        diagnostics.pages_detected = list(detected)
+        diagnostics.pages_skipped = [
+            p for p in range(1, diagnostics.total_pages + 1) if p not in detected
+        ]
+    except Exception as exc:
+        diagnostics.errors.append(f"table-page detection failed: {exc}")
+        log.warning("table-page detection failed for %s: %s", pdf_file, exc)
+    return detected, diagnostics
+
+
+def extract_tables(
+    pdf_file: Path,
+    diagnostics: TableDiagnostics | None = None,
+) -> list[dict[str, Any]]:
     import camelot
 
+    diag = diagnostics or TableDiagnostics()
     results: list[dict[str, Any]] = []
     lattice_by_page: dict[int, list[dict[str, Any]]] = {}
 
+    detected_pages, detected_diag = detect_table_pages(pdf_file)
+    diag.pages_detected = list(detected_pages)
+    diag.total_pages = detected_diag.total_pages
+    diag.pages_skipped = [
+        p for p in range(1, diag.total_pages + 1) if p not in detected_pages
+    ]
+
+    # No table-like pages found: skip Camelot entirely and fall back to the
+    # unstructured HTML placeholders already attached to table elements.
+    if not detected_pages:
+        log.info(
+            "table detection: no table-like pages in %s; skipping Camelot",
+            pdf_file,
+        )
+        return results
+
     try:
-        lattice = camelot.read_pdf(str(pdf_file), pages="all", flavor="lattice")
-    except Exception:
+        lattice = camelot.read_pdf(
+            str(pdf_file),
+            pages=",".join(str(p) for p in sorted(detected_pages)),
+            flavor="lattice",
+        )
+        diag.lattice_pages = sorted({int(t.page) for t in lattice})
+    except Exception as exc:
+        diag.errors.append(f"lattice extraction failed: {exc}")
+        log.warning("camelot lattice failed for %s: %s", pdf_file, exc)
         lattice = []
 
     for tbl in lattice or []:
@@ -369,24 +474,15 @@ def extract_tables(pdf_file: Path) -> list[dict[str, Any]]:
         results.append(entry)
         lattice_by_page.setdefault(page, []).append(entry)
 
-    try:
-        import pypdf
-
-        num_pages = len(pypdf.PdfReader(str(pdf_file)).pages)
-    except Exception:
-        num_pages = 0
-
     # Run stream on pages where lattice missed OR produced only 1-col tables
     pages_need_stream: set[int] = set()
-    for p in range(1, num_pages + 1):
+    for p in detected_pages:
         if p not in lattice_by_page:
             pages_need_stream.add(p)
         else:
             # Lattice with only 1 column → likely a merged-cell table;
             # stream flavour often recovers proper column structure.
-            if all(
-                count_table_rows(e["markdown"])[1] <= 1 for e in lattice_by_page[p]
-            ):
+            if all(count_table_rows(e["markdown"])[1] <= 1 for e in lattice_by_page[p]):
                 pages_need_stream.add(p)
 
     if pages_need_stream:
@@ -396,7 +492,10 @@ def extract_tables(pdf_file: Path) -> list[dict[str, Any]]:
                 pages=",".join(str(p) for p in sorted(pages_need_stream)),
                 flavor="stream",
             )
-        except Exception:
+            diag.stream_pages = sorted({int(t.page) for t in stream})
+        except Exception as exc:
+            diag.errors.append(f"stream extraction failed: {exc}")
+            log.warning("camelot stream failed for %s: %s", pdf_file, exc)
             stream = []
         stream_cols_by_page: dict[int, int] = {}
         for tbl in stream or []:
@@ -413,26 +512,22 @@ def extract_tables(pdf_file: Path) -> list[dict[str, Any]]:
                     "flavor": "stream",
                 }
             )
-            stream_cols_by_page[page] = max(
-                stream_cols_by_page.get(page, 0), ncols
-            )
+            stream_cols_by_page[page] = max(stream_cols_by_page.get(page, 0), ncols)
 
         # Drop lattice results from pages where stream found better structure
-        pages_with_good_stream = {
-            p for p, c in stream_cols_by_page.items() if c > 1
-        }
+        pages_with_good_stream = {p for p, c in stream_cols_by_page.items() if c > 1}
         if pages_with_good_stream:
             results = [
                 r
                 for r in results
                 if not (
-                    r["flavor"] == "lattice"
-                    and r["page"] in pages_with_good_stream
+                    r["flavor"] == "lattice" and r["page"] in pages_with_good_stream
                 )
             ]
 
     # Merge consecutive pages that share the same table structure ----------
     results = _merge_consecutive(results)
+    diag.tables_extracted = len(results)
 
     return results
 
@@ -492,37 +587,47 @@ async def describe_one(
         return ""
 
     snippet = _build_describe_snippet(markdown, page_range)
-    client = AsyncOpenAI(
-        base_url=settings.openrouter_base_url,
-        api_key=settings.openrouter_api_key,
-        default_headers={
-            "HTTP-Referer": "https://localhost/chat-pdf",
-            "X-Title": "chat_pdf table description",
-        },
-        timeout=settings.slow_upstream_request_timeout,
-    )
-    try:
-        response = await client.chat.completions.create(
-            model=settings.table_describer_model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": DESCRIBE_PROMPT.format(markdown=snippet[:6000]),
-                }
-            ],
-            extra_body={"reasoning": {"effort": "minimal"}},
+    max_retries = max(0, settings.table_describer_max_retries)
+    for attempt in range(max_retries + 1):
+        client = AsyncOpenAI(
+            base_url=settings.openrouter_base_url,
+            api_key=settings.openrouter_api_key,
+            default_headers={
+                "HTTP-Referer": "https://localhost/chat-pdf",
+                "X-Title": "chat_pdf table description",
+            },
+            timeout=settings.slow_upstream_request_timeout,
         )
-        return str(response.choices[0].message.content or "").strip()
-    except Exception:
-        import logging
-
-        logging.getLogger(__name__).warning(
-            "table describe_one failed (model=%s, timeout=%.0fs)",
-            settings.table_describer_model,
-            settings.slow_upstream_request_timeout,
-            exc_info=True,
-        )
-        return ""
+        try:
+            response = await client.chat.completions.create(
+                model=settings.table_describer_model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": DESCRIBE_PROMPT.format(markdown=snippet[:6000]),
+                    }
+                ],
+                extra_body={"reasoning": {"effort": "minimal"}},
+            )
+            description = str(response.choices[0].message.content or "").strip()
+            if description:
+                return description
+            log.warning(
+                "table describe_one returned empty content (attempt %d)", attempt
+            )
+        except Exception:
+            log.warning(
+                "table describe_one failed (model=%s, timeout=%.0fs, attempt=%d/%d)",
+                settings.table_describer_model,
+                settings.slow_upstream_request_timeout,
+                attempt + 1,
+                max_retries + 1,
+                exc_info=True,
+            )
+        if attempt < max_retries:
+            delay = settings.table_describer_retry_base_seconds * (2**attempt)
+            await asyncio.sleep(delay * (0.5 + random.random()))
+    return ""
 
 
 def count_table_rows(markdown: str) -> tuple[int, int]:
@@ -543,7 +648,7 @@ async def enrich_tables(
     pdf_file: Path,
     root: Section,
     placeholders: list[ElementRef],
-) -> None:
+) -> TableDiagnostics:
     """Extract tables with camelot and attach them to the section tree.
 
     Existing ``ElementRef`` table placeholders (from the unstructured partition)
@@ -552,10 +657,14 @@ async def enrich_tables(
     ``ElementRef`` entries attached to *root* so they still reach the chunker.
     """
     table_placeholders = [e for e in placeholders if e.type == "table"]
+    diagnostics = TableDiagnostics()
 
-    camelot_tables = await asyncio.to_thread(extract_tables, pdf_file)
+    camelot_tables = await asyncio.to_thread(extract_tables, pdf_file, diagnostics)
     if not camelot_tables:
-        return
+        diagnostics.errors.append(
+            "no tables extracted; using unstructured table HTML placeholders"
+        )
+        return diagnostics
 
     # Initialise existing placeholders ----------------------------------------
     for ph in table_placeholders:
@@ -609,30 +718,32 @@ async def enrich_tables(
 
     # 3. Generate descriptions for everything ----------------------------------
     if not to_describe:
-        return
+        return diagnostics
 
-    descriptions = await asyncio.gather(
-        *[describe_one(md, page_range=pr) for _, md, pr in to_describe]
-    )
+    async with table_semaphore():
+        descriptions = await asyncio.gather(
+            *[describe_one(md, page_range=pr) for _, md, pr in to_describe]
+        )
     succeeded = 0
     for (ph, _, _), desc in zip(to_describe, descriptions, strict=False):
         ph.extra["description"] = desc
         if desc:
             succeeded += 1
     if succeeded < len(to_describe):
-        import logging
-
-        logging.getLogger(__name__).warning(
+        log.warning(
             "table description: %d/%d succeeded (model=%s)",
             succeeded,
             len(to_describe),
             settings.table_describer_model,
         )
+        diagnostics.errors.append(
+            f"table descriptions: {len(to_describe) - succeeded}/"
+            f"{len(to_describe)} failed; heuristic fallback used"
+        )
 
     # 4. Prune text elements that overlap detected table regions ---------------
     removed = _suppress_text_in_table_bboxes(root)
     if removed:
-        import logging
-        logging.getLogger(__name__).debug(
-            "suppressed %d text element(s) inside table bboxes", removed
-        )
+        log.debug("suppressed %d text element(s) inside table bboxes", removed)
+
+    return diagnostics
