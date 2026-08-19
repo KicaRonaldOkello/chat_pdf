@@ -170,7 +170,7 @@ export class DocumentSessionService implements OnDestroy {
   static readonly CHAT_RAIL_STORAGE_KEY = CHAT_RAIL_STORAGE_KEY;
 
   messageRoleLabel(role: 'user' | 'assistant'): string {
-    return role === 'user' ? 'Researcher' : 'Lumen';
+    return role === 'user' ? 'Researcher' : 'Understanding Notes';
   }
 
   verdictClass(verdict?: 'pass' | 'retry' | 'reject'): string {

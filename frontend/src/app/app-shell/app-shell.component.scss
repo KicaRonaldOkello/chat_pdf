@@ -1,6 +1,6 @@
-// Lumen workspace — SCSS (no Tailwind). Inter + Newsreader; Material Symbols in template.
-
-$lumen-bg: #f9f9f9;
+$color-primary-green: #00B074;
+$color-primary-green-hover: #009663;
+$lumen-bg: #fbfbfb;
 $lumen-on-surface: #1a1c1c;
 $lumen-secondary: #5e5e5e;
 $lumen-zinc-200: #e4e4e7;
@@ -10,9 +10,9 @@ $lumen-surface-low: #f3f3f4;
 $lumen-surface-container: #eeeeee;
 $lumen-surface-lowest: #ffffff;
 $lumen-outline-variant: #c6c6c6;
-$lumen-on-primary: #e2e2e2;
-$lumen-primary: #000000;
-$lumen-primary-container: #3b3b3b;
+$lumen-on-primary: #ffffff;
+$lumen-primary: #00B074;
+$lumen-primary-container: #009663;
 $scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
 
 :host {
@@ -48,7 +48,7 @@ $scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: $lumen-bg;
+  background: #ffffff;
   border-right: 1px solid $lumen-zinc-200;
   transition: flex-basis 0.2s ease, width 0.2s ease;
   overflow: hidden;
@@ -60,8 +60,35 @@ $scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
 }
 
 .lumen-sidebar__brand {
-  padding: 0.75rem 1.5rem 1.5rem;
+  padding: 1.25rem 1.25rem 1.25rem;
   flex-shrink: 0;
+}
+
+.lumen-sidebar__brand--collapsed {
+  padding: 1.25rem 0.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.lumen-sidebar__brand-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.lumen-sidebar__logo {
+  height: 96px;
+  max-width: 220px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.lumen-sidebar__logo-symbol {
+  height: 44px;
+  width: 44px;
+  object-fit: contain;
+  display: block;
 }
 
 .lumen-sidebar__brand-title {
@@ -99,9 +126,10 @@ $scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
   align-items: center;
   gap: 1rem;
   width: 100%;
-  padding: 1rem 1.5rem;
+  padding: 0.85rem 1.25rem;
   border: none;
   border-left: 4px solid transparent;
+  border-radius: 0 8px 8px 0;
   background: transparent;
   cursor: pointer;
   font: inherit;
@@ -111,33 +139,33 @@ $scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
 }
 
 .lumen-sidebar__item .material-symbols-outlined {
-  font-size: 24px;
+  font-size: 22px;
   opacity: 0.9;
 }
 
 .sidebar--collapsed .lumen-sidebar__item {
   justify-content: center;
-  padding: 1rem;
+  padding: 0.85rem;
   gap: 0;
+  border-radius: 8px;
 }
 
 .lumen-sidebar__item:hover {
-  color: #000;
-  background: $lumen-surface-low;
+  color: $color-primary-green;
+  background: rgba(0, 176, 116, 0.05);
 }
 
 .lumen-sidebar__item--active {
-  color: #000;
+  color: $color-primary-green;
   font-weight: 600;
-  background: $lumen-surface-lowest;
-  border-left-color: #000;
+  background: rgba(0, 176, 116, 0.08);
+  border-left-color: $color-primary-green;
 }
 
 .lumen-sidebar__item-label {
-  font-family: Newsreader, Georgia, serif;
-  font-size: 1.125rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 500;
 }
 
 .lumen-sidebar__tokens {
@@ -170,7 +198,7 @@ $scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
 .lumen-tokens__value {
   font-size: 10px;
   font-weight: 700;
-  color: #000;
+  color: $color-primary-green;
 }
 
 .lumen-tokens__track {
@@ -183,7 +211,7 @@ $scholarly-shadow: 0 40px 60px -20px rgba(26, 28, 28, 0.04);
 
 .lumen-tokens__fill {
   height: 100%;
-  background: #000;
+  background: $color-primary-green;
   border-radius: inherit;
   transition: width 0.3s ease;
 }

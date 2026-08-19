@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+  <!-- Background -->
+  <rect width="500" height="500" rx="24" fill="#18181B"/>
+  
+  <!-- Grid Symbol -->
+  <g fill="#00B074">
+    <!-- Row 1 -->
+    <circle cx="150" cy="90" r="22"/>
+    <circle cx="200" cy="90" r="10"/>
+    <circle cx="250" cy="90" r="16"/>
+    <circle cx="300" cy="90" r="10"/>
+    <circle cx="350" cy="90" r="22"/>
+    
+    <!-- Row 2 -->
+    <circle cx="150" cy="140" r="10"/>
+    <circle cx="200" cy="140" r="16"/>
+    <circle cx="250" cy="140" r="10"/>
+    <circle cx="300" cy="140" r="16"/>
+    <circle cx="350" cy="140" r="10"/>
+    
+    <!-- Row 3 -->
+    <circle cx="150" cy="190" r="16"/>
+    <circle cx="200" cy="190" r="10"/>
+    <circle cx="250" cy="190" r="28"/>
+    <circle cx="300" cy="190" r="10"/>
+    <circle cx="350" cy="190" r="16"/>
+    
+    <!-- Row 4 -->
+    <circle cx="150" cy="240" r="10"/>
+    <circle cx="200" cy="240" r="16"/>
+    <circle cx="250" cy="240" r="10"/>
+    <circle cx="300" cy="240" r="16"/>
+    <circle cx="350" cy="240" r="10"/>
+    
+    <!-- Row 5 -->
+    <circle cx="150" cy="290" r="22"/>
+    <circle cx="200" cy="290" r="10"/>
+    <circle cx="250" cy="290" r="16"/>
+    <circle cx="300" cy="290" r="10"/>
+    <circle cx="350" cy="290" r="22"/>
+  </g>
+  
+  <!-- Typography -->
+  <text x="250" y="360" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="28" font-weight="500" letter-spacing="4" fill="#FFFFFF" text-anchor="middle">UNDERSTANDING</text>
+  <text x="250" y="440" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="78" font-weight="700" letter-spacing="3" fill="#FFFFFF" text-anchor="middle">NOTES</text>
+</svg>

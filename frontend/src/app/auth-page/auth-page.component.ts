@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { environment } from '../../environments/environment';
 
@@ -19,13 +19,15 @@ declare global {
 export class AuthPageComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   googleLoaded = signal(false);
+  protected readonly signUpMode = this.route.snapshot.data['mode'] === 'signup';
 
   async ngOnInit(): Promise<void> {
     // Already signed in — redirect straight to the app
     if (this.authService.isSignedIn()) {
-      this.router.navigate(['/app']);
+      await this.router.navigateByUrl(this.resolveReturnUrl());
       return;
     }
 
@@ -38,10 +40,17 @@ export class AuthPageComponent implements OnInit {
         client_id: environment.googleClientId,
         callback: this.handleCredentialResponse.bind(this),
         auto_select: false,
+        context: this.signUpMode ? 'signup' : 'signin',
       });
       google.accounts.id.renderButton(
         document.getElementById('google-login-btn')!,
-        { theme: 'outline', size: 'large', width: '100%', text: 'signin_with', logo_alignment: 'left' }
+        {
+          theme: 'outline',
+          size: 'large',
+          width: '100%',
+          text: this.signUpMode ? 'signup_with' : 'signin_with',
+          logo_alignment: 'left',
+        }
       );
     }
   }
@@ -49,9 +58,18 @@ export class AuthPageComponent implements OnInit {
   private async handleCredentialResponse(response: any): Promise<void> {
     try {
       await this.authService.signInWithGoogle(response.credential);
-      this.router.navigate(['/app']);
+      await this.router.navigateByUrl(this.resolveReturnUrl());
     } catch (error) {
       console.error('Sign-in failed:', error);
     }
+  }
+
+  /** Allow only same-app relative paths (blocks open redirects). */
+  private resolveReturnUrl(): string {
+    const raw = this.route.snapshot.queryParamMap.get('returnUrl');
+    if (raw && raw.startsWith('/') && !raw.startsWith('//')) {
+      return raw;
+    }
+    return '/app';
   }
 }
