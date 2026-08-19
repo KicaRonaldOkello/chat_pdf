@@ -1,7 +1,26 @@
-/* You can add global styles to this file, and also import other style files */
+:root {
+  --color-primary-green: #00B074;
+  --color-primary-green-hover: #009663;
+  --color-bg-dark: #18181B;
+  --color-bg-light: #FFFFFF;
+  --color-surface-dark: #27272A;
+  --color-text-primary: #000000;
+  --color-text-dark-mode: #FFFFFF;
+  --color-border: #E4E4E7;
+
+  --mdc-theme-primary: #00B074;
+  --mdc-filled-button-container-color: #00B074;
+  --mdc-filled-button-label-text-color: #FFFFFF;
+  --mat-flat-button-state-layer-color: #009663;
+}
 
 html, body { height: 100%; }
-body { margin: 0; font-family: Inter, system-ui, sans-serif; }
+body {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+  background-color: var(--color-bg-light);
+  color: var(--color-text-primary);
+}
 
 /* Lumen snackbar overlay: clear app sidebar + bottom margin */
 .cdk-overlay-pane.lumen-snack-host {
@@ -11,16 +30,16 @@ body { margin: 0; font-family: Inter, system-ui, sans-serif; }
 .cdk-overlay-pane.lumen-library-dialog-panel .mat-mdc-dialog-container {
   padding: 1.25rem 1.25rem 1rem;
   border-radius: 0.75rem;
-  border: 1px solid #e4e4e7;
-  box-shadow: 0 24px 48px -12px rgba(26, 28, 28, 0.12);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 24px 48px -12px rgba(24, 24, 27, 0.12);
   background: #fff;
 }
 
-/* Lumen: Material spinners (mat-spinner / mat-progress-spinner) in black */
+/* Material spinners with brand primary green */
 .mat-mdc-progress-spinner {
-  --mdc-circular-progress-active-indicator-color: #1a1a1a;
-  --mdc-circular-progress-color: #1a1a1a;
-  --mdc-circular-progress-track-color: rgba(0, 0, 0, 0.12);
+  --mdc-circular-progress-active-indicator-color: #00B074;
+  --mdc-circular-progress-color: #00B074;
+  --mdc-circular-progress-track-color: rgba(0, 176, 116, 0.15);
 }
 
 @media (min-width: 768px) {

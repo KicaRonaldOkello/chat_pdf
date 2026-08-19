@@ -1,36 +1,151 @@
 <div class="landing">
   <header class="landing-header">
     <div class="landing-header__inner">
-      <a class="landing-logo" routerLink="/">LUMEN</a>
+      <a class="landing-logo" routerLink="/">
+        <img src="assets/color_logo_on_white.svg" alt="Understanding Notes" class="landing-logo__img" />
+      </a>
       <nav class="landing-nav" aria-label="Primary">
-        <a class="landing-nav__link landing-nav__link--active" href="#">Features</a>
-        <a class="landing-nav__link" href="#">Use cases</a>
-        <a class="landing-nav__link" href="#">Pricing</a>
+        <a class="landing-nav__link landing-nav__link--active" routerLink="/">Home</a>
+        <a class="landing-nav__link" href="#what-it-does">What it does</a>
+        <a class="landing-nav__link" href="#how-it-works">How it works</a>
+        <a class="landing-nav__link" href="#services">Features</a>
+        <a class="landing-nav__link" href="#compare">Compare</a>
+        <a class="landing-nav__link" href="#security">Security</a>
       </nav>
-      <a class="landing-nav__link" routerLink="/sign-in">Sign in</a>
-      <a class="landing-btn landing-btn--sm" routerLink="/app">Begin Research</a>
+      <div class="landing-header__actions">
+        <a class="landing-nav__link landing-nav__link--signin" routerLink="/sign-in">Sign in</a>
+        <a
+          class="landing-btn landing-btn--primary landing-btn--sm"
+          [routerLink]="researchRoute()"
+          [queryParams]="researchQueryParams()"
+          >Begin Research</a
+        >
+        <button
+          type="button"
+          class="landing-menu-toggle"
+          (click)="menuOpen.set(!menuOpen())"
+          [attr.aria-expanded]="menuOpen()"
+          aria-controls="landing-mobile-menu"
+          aria-label="Toggle navigation menu"
+        >
+          <span class="material-symbols-outlined" aria-hidden="true">{{ menuOpen() ? 'close' : 'menu' }}</span>
+        </button>
+      </div>
     </div>
     <div class="landing-header__rule" aria-hidden="true"></div>
+
+    @if (menuOpen()) {
+      <nav id="landing-mobile-menu" class="landing-mobile-menu" aria-label="Mobile">
+        <a class="landing-mobile-menu__link" routerLink="/" (click)="menuOpen.set(false)">Home</a>
+        <a class="landing-mobile-menu__link" href="#what-it-does" (click)="menuOpen.set(false)">What it does</a>
+        <a class="landing-mobile-menu__link" href="#how-it-works" (click)="menuOpen.set(false)">How it works</a>
+        <a class="landing-mobile-menu__link" href="#services" (click)="menuOpen.set(false)">Features</a>
+        <a class="landing-mobile-menu__link" href="#compare" (click)="menuOpen.set(false)">Compare</a>
+        <a class="landing-mobile-menu__link" href="#security" (click)="menuOpen.set(false)">Security</a>
+        <a class="landing-mobile-menu__link" routerLink="/sign-in" (click)="menuOpen.set(false)">Sign in</a>
+        <a
+          class="landing-btn landing-btn--primary landing-btn--sm landing-mobile-menu__cta"
+          [routerLink]="researchRoute()"
+          [queryParams]="researchQueryParams()"
+          (click)="menuOpen.set(false)"
+          >Begin Research</a
+        >
+      </nav>
+    }
   </header>
 
   <main class="landing-main">
     <section class="landing-hero">
       <div class="landing-hero__copy">
-        <h1 class="landing-hero__title">Your documents now with a voice and a mind.</h1>
+        <p class="landing-hero__kicker">For researchers, analysts, and teams</p>
+        <h1 class="landing-hero__title">Deep understanding, powered by AI.</h1>
         <p class="landing-hero__lead">
-          Transform the way you interact with information. Chat with your PDFs, generate instant summaries and
-          listen to reports while you move.
+          Upload your documents — PDFs, scans, tables, and figures — and ask anything. Understanding Notes reads them
+          deeply and answers with every claim cited to the exact page, table, or chart.
         </p>
         <div class="landing-hero__actions">
-          <a class="landing-btn landing-btn--lg" routerLink="/app">Begin Research</a>
+          <a
+            class="landing-btn landing-btn--primary landing-btn--lg"
+            [routerLink]="researchRoute()"
+            [queryParams]="researchQueryParams()"
+            >Begin Research</a
+          >
+          <a class="landing-hero__secondary" href="#demo">See it in action</a>
         </div>
       </div>
-      <div class="landing-hero__image-wrap">
-        <img
-          class="landing-hero__image"
-          alt="Minimalist overhead shot of a single open antique book on a stark white gallery table with harsh, architectural shadows."
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuD7S9KN5-4gWSPCvGY2j_0H1HmamKnQgwBT3uQk_ITyeCXnm6L4yq6zg4N1Q_-Rtl0h81XL15r3OduT5I-pmxNs0Ii8P6MMSTS-Zis3_kb5Pmi2Cr1sXg7GSwtDbekUYSawL3QhnLp3yopz0h62O-lEXtjX89JotgFVIC9ihZMaRbh-lrgobLMhUSHJGwW8kXk_055odbTJY_KLQTZa4SsBujz8tzgr5Va7xyOIHkp5sfIhyIlUyQzdJYS4EX-UUUnROuNyrQ5C-2k"
-        />
+      <div class="landing-hero__mock">
+        <div class="app-mock">
+          <div class="app-mock__bar">
+            <span class="app-mock__dot app-mock__dot--red"></span>
+            <span class="app-mock__dot app-mock__dot--amber"></span>
+            <span class="app-mock__dot app-mock__dot--green"></span>
+            <span class="app-mock__title">Understanding Notes</span>
+          </div>
+          <div class="app-mock__body app-mock__body--split">
+            <div class="app-mock__pdf" aria-hidden="true">
+              <div class="app-mock__pdf-toolbar">
+                <span>1 of 49</span>
+                <span>100%</span>
+              </div>
+              <div class="app-mock__pdf-title app-mock__pdf-title--doc">
+                INTELLECTUAL PROPERTY — PATENTS, INDUSTRIAL DESIGNS AND UTILITY MODELS
+              </div>
+              <div class="app-mock__pdf-title app-mock__pdf-title--section">CLASS ONE — BACKGROUND AND INTRODUCTION TO PATENTS</div>
+              <p class="app-mock__pdf-text">
+                Patents originated from the industrial society in England. Their roots can be traced to the medieval
+                period through Letters Patent.
+              </p>
+              <p class="app-mock__pdf-text app-mock__pdf-text--strong">
+                Letters Patent — open letters issued by the King under the royal seal, granting special rights and
+                privileges to foreign craftsmen, weavers, and skilled artisans.
+              </p>
+              <p class="app-mock__pdf-text app-mock__pdf-text--highlight">
+                Temporary presence of patented products on foreign aircraft, ships, and vehicles does not infringe.
+              </p>
+              <p class="app-mock__pdf-text">
+                Purpose of Letters Patent: to encourage new industries and commerce, and to give the Crown control
+                over trade.
+              </p>
+            </div>
+            <div class="app-mock__chat">
+              <div class="chat-mock__msg chat-mock__msg--user">
+                How do patents link with shipping?
+              </div>
+              <div class="chat-mock__msg chat-mock__msg--assistant">
+                The link runs through "temporary presence" — a legal exception: patented products on foreign ships or
+                vehicles do not constitute infringement.
+              </div>
+              <div class="chat-mock__trust">
+                <span class="material-symbols-outlined chat-mock__trust-icon" aria-hidden="true">verified</span>
+                <span class="chat-mock__trust-text">PASS · grounded 10/10 · relevance 10/10</span>
+                <span class="material-symbols-outlined chat-mock__trust-chevron" aria-hidden="true">expand_more</span>
+              </div>
+              <div class="chat-mock__source">
+                <span class="chat-mock__source-head">
+                  <span class="chat-mock__source-section">PATENTS — INSTRUCTORS NOTES</span>
+                  <span class="chat-mock__source-page">p.4</span>
+                  <span class="chat-mock__source-type">text</span>
+                  <span class="material-symbols-outlined chat-mock__source-jump" aria-hidden="true">north_east</span>
+                </span>
+                <span class="chat-mock__source-preview">
+                  Temporary presence of patented products on foreign aircraft, ships, and vehicles does not infringe…
+                </span>
+              </div>
+              <div class="chat-mock__composer">
+                <span class="chat-mock__composer-hint">Ask about your document(s)…</span>
+                <span class="material-symbols-outlined chat-mock__composer-send" aria-hidden="true">arrow_upward</span>
+              </div>
+              <div class="chat-mock__status">
+                <span>2 files in scope</span>
+                <span>TOKENS REMAINING 84%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="landing-hero__mock-caption">
+          <span class="material-symbols-outlined" aria-hidden="true">verified</span>
+          Every answer cites the exact page, table, or chart.
+        </p>
       </div>
     </section>
 
@@ -38,9 +153,218 @@
       <span class="landing-social__text">Trusted by over 10,000 scholars and researchers</span>
     </section>
 
-    <section class="landing-features">
+    <section class="landing-demo" id="demo">
+      <div class="landing-demo__inner">
+        <div class="landing-demo__head">
+          <p class="landing-demo__eyebrow">See it in action</p>
+          <h2 class="landing-demo__title">One question. Every answer sourced.</h2>
+        </div>
+        <div class="app-mock app-mock--wide landing-demo__mock">
+          <div class="app-mock__bar">
+            <span class="app-mock__dot app-mock__dot--red"></span>
+            <span class="app-mock__dot app-mock__dot--amber"></span>
+            <span class="app-mock__dot app-mock__dot--green"></span>
+            <span class="app-mock__title">Understanding Notes</span>
+          </div>
+          <div class="app-mock__docs">
+            <span class="app-mock__docs-count">&lt; 2 documents</span>
+            <div class="app-mock__tabs" aria-hidden="true">
+              <span class="app-mock__tab">Manifest_Shipping_Co_Ltd…</span>
+              <span class="app-mock__tab app-mock__tab--active">1 PATENTS, UTILITY MODE…</span>
+            </div>
+            <span class="app-mock__docs-action">Close all</span>
+          </div>
+          <div class="app-mock__layout">
+            <div class="app-mock__sidebar" aria-hidden="true">
+              <div class="app-mock__side-brand">
+                <span class="app-mock__side-brand-name">UNDERSTANDING NOTES</span>
+                <span class="app-mock__side-brand-sub">Chat · AI Assistant</span>
+              </div>
+              <div class="app-mock__side-nav">
+                <span class="app-mock__side-item app-mock__side-item--active">
+                  <span class="material-symbols-outlined" aria-hidden="true">home</span>
+                  Home
+                </span>
+                <span class="app-mock__side-item">
+                  <span class="material-symbols-outlined" aria-hidden="true">person_search</span>
+                  Researcher
+                </span>
+                <span class="app-mock__side-item">
+                  <span class="material-symbols-outlined" aria-hidden="true">upload_file</span>
+                  Batch upload
+                </span>
+                <span class="app-mock__side-item">
+                  <span class="material-symbols-outlined" aria-hidden="true">menu_book</span>
+                  Library
+                </span>
+              </div>
+              <div class="app-mock__side-user">Okello Ronald</div>
+            </div>
+            <div class="app-mock__pdf" aria-hidden="true">
+              <div class="app-mock__pdf-toolbar">
+                <span>1 of 49</span>
+                <span>100%</span>
+              </div>
+              <div class="app-mock__pdf-title app-mock__pdf-title--doc">
+                INTELLECTUAL PROPERTY — PATENTS, INDUSTRIAL DESIGNS AND UTILITY MODELS
+              </div>
+              <div class="app-mock__pdf-title app-mock__pdf-title--section">
+                CLASS ONE — BACKGROUND AND INTRODUCTION TO PATENTS
+              </div>
+              <p class="app-mock__pdf-text">
+                Patents originated from the industrial society in England. Their roots can be traced to the medieval
+                period through Letters Patent — open letters issued by the King under the royal seal.
+              </p>
+              <p class="app-mock__pdf-text">
+                Letters Patent granted special rights and privileges, especially to foreign craftsmen, weavers, and
+                skilled artisans. Early patents did not require invention or novelty; the focus was on trade promotion
+                and royal favour.
+              </p>
+              <p class="app-mock__pdf-text">
+                In 1311, a patent was granted to John Kempe, who was allowed to practice weaving in England despite
+                guild restrictions.
+              </p>
+              <p class="app-mock__pdf-text app-mock__pdf-text--highlight">
+                Temporary presence of patented products on foreign aircraft, ships, and vehicles does not infringe.
+              </p>
+              <p class="app-mock__pdf-text">
+                Prior user rights — a person who used the invention before patent filing, or made serious preparations,
+                may continue using it. The right only covers prior acts already undertaken.
+              </p>
+            </div>
+            <div class="app-mock__chat">
+              <div class="chat-mock__msg chat-mock__msg--user">How do patents link with shipping?</div>
+              <div class="chat-mock__msg chat-mock__msg--assistant">
+                The documents connect the two through "temporary presence" — patented products on foreign ships or
+                vehicles do not constitute infringement.
+              </div>
+              <div class="chat-mock__trust">
+                <span class="material-symbols-outlined chat-mock__trust-icon" aria-hidden="true">verified</span>
+                <span class="chat-mock__trust-text">PASS · grounded 10/10 · relevance 10/10 · via semantic</span>
+                <span class="material-symbols-outlined chat-mock__trust-chevron" aria-hidden="true">expand_less</span>
+              </div>
+              <div class="chat-mock__panel">
+                <div class="chat-mock__panel-row">
+                  <span class="chat-mock__panel-label">PLAN</span>
+                  <span class="chat-mock__panel-val">semantic — the query connects two distinct concepts</span>
+                </div>
+                <div class="chat-mock__panel-row">
+                  <span class="chat-mock__panel-label">SOURCES (8)</span>
+                </div>
+                <div class="chat-mock__source">
+                  <span class="chat-mock__source-head">
+                    <span class="chat-mock__source-section">9aba35d7… · Doctrine of Equivalents</span>
+                    <span class="chat-mock__source-page">p.45</span>
+                    <span class="chat-mock__source-type">text</span>
+                    <span class="material-symbols-outlined chat-mock__source-jump" aria-hidden="true">north_east</span>
+                  </span>
+                  <span class="chat-mock__source-preview">
+                    No infringement where goods were lawfully placed on the market by the patent owner…
+                  </span>
+                </div>
+                <div class="chat-mock__source">
+                  <span class="chat-mock__source-head">
+                    <span class="chat-mock__source-section">9aba35d7… · Types of Patents</span>
+                    <span class="chat-mock__source-page">p.41</span>
+                    <span class="chat-mock__source-type">text</span>
+                    <span class="material-symbols-outlined chat-mock__source-jump" aria-hidden="true">north_east</span>
+                  </span>
+                  <span class="chat-mock__source-preview">
+                    Product patents protect physical products; the doctrine of equivalents covers non-literal
+                    infringement…
+                  </span>
+                </div>
+              </div>
+              <div class="chat-mock__composer">
+                <span class="chat-mock__composer-hint">Ask about your document(s)…</span>
+                <span class="material-symbols-outlined chat-mock__composer-send" aria-hidden="true">arrow_upward</span>
+              </div>
+              <div class="chat-mock__status">
+                <span>2 files in scope</span>
+                <span>TOKENS REMAINING 84%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="landing-demo__chips">
+          <span class="landing-demo__chip">Answers cite the exact passage</span>
+          <span class="landing-demo__chip">Works across thousands of files</span>
+          <span class="landing-demo__chip">Summaries, transcripts, and exports</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-capabilities" id="what-it-does">
+      <div class="landing-capabilities__inner">
+        <div class="landing-capabilities__head">
+          <p class="landing-capabilities__eyebrow">What it does</p>
+          <h2 class="landing-capabilities__title">A research workspace that reads everything for you.</h2>
+        </div>
+        <div class="landing-capabilities__grid">
+          <article class="landing-capabilities__card">
+            <span class="material-symbols-outlined landing-capabilities__icon" aria-hidden="true">menu_book</span>
+            <h3 class="landing-capabilities__card-title">Read</h3>
+            <p class="landing-capabilities__card-body">
+              Upload PDFs, scanned pages, tables, and figures. Understanding Notes indexes the whole document — not
+              just the text layer.
+            </p>
+          </article>
+          <article class="landing-capabilities__card">
+            <span class="material-symbols-outlined landing-capabilities__icon" aria-hidden="true">summarize</span>
+            <h3 class="landing-capabilities__card-title">Understand</h3>
+            <p class="landing-capabilities__card-body">
+              Get concise summaries, structured answers, and comparisons — built from your documents alone, with every
+              claim cited.
+            </p>
+          </article>
+          <article class="landing-capabilities__card">
+            <span class="material-symbols-outlined landing-capabilities__icon" aria-hidden="true">verified_user</span>
+            <h3 class="landing-capabilities__card-title">Trust</h3>
+            <p class="landing-capabilities__card-body">
+              Every answer points back to the exact passage, table, or chart it came from. Your documents are never
+              used to train models.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-how" id="how-it-works">
+      <div class="landing-how__inner">
+        <div class="landing-how__head">
+          <p class="landing-how__eyebrow">How it works</p>
+          <h2 class="landing-how__title">From upload to cited answer in three steps.</h2>
+        </div>
+        <div class="landing-how__steps">
+          <div class="landing-how__step">
+            <span class="landing-how__num" aria-hidden="true">01</span>
+            <h3 class="landing-how__step-title">Upload</h3>
+            <p class="landing-how__step-body">
+              Add your PDFs, reports, and notes. Understanding Notes reads and indexes everything — including scans,
+              tables, and figures.
+            </p>
+          </div>
+          <div class="landing-how__step">
+            <span class="landing-how__num" aria-hidden="true">02</span>
+            <h3 class="landing-how__step-title">Ask</h3>
+            <p class="landing-how__step-body">
+              Chat with one document or your entire library. Ask for summaries, comparisons, or specific passages.
+            </p>
+          </div>
+          <div class="landing-how__step">
+            <span class="landing-how__num" aria-hidden="true">03</span>
+            <h3 class="landing-how__step-title">Verify &amp; use</h3>
+            <p class="landing-how__step-body">
+              Check every answer against its cited source, then export the summary or citation.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-features" id="services">
       <div class="landing-features__grid">
-        <div class="landing-feature landing-feature--text landing-feature--01">
+        <div class="landing-feature landing-feature--text landing-feature--01" id="feature-chat">
           <p class="landing-feature__eyebrow">01 / Chat</p>
           <h2 class="landing-feature__title">Chat with documents</h2>
           <p class="landing-feature__body">
@@ -48,13 +372,47 @@
           </p>
           <div class="landing-feature__rule" aria-hidden="true"></div>
         </div>
-        <div class="landing-feature landing-feature--icon">
-          <span class="material-symbols-outlined landing-feature__icon landing-feature__icon--large" aria-hidden="true"
-            >auto_stories</span
-          >
+        <div class="landing-feature landing-feature--proof">
+          <div class="proof-card proof-card--chat">
+            <div class="chat-mock__msg chat-mock__msg--user">
+              What was the sample size in Section 3?
+            </div>
+            <div class="chat-mock__msg chat-mock__msg--assistant">
+              214 participants across four sites.
+            </div>
+            <div class="chat-mock__trust">
+              <span class="material-symbols-outlined chat-mock__trust-icon" aria-hidden="true">verified</span>
+              <span class="chat-mock__trust-text">PASS · grounded 10/10 · relevance 10/10</span>
+            </div>
+            <div class="chat-mock__source">
+              <span class="chat-mock__source-head">
+                <span class="chat-mock__source-section">Methods</span>
+                <span class="chat-mock__source-page">p.4</span>
+                <span class="chat-mock__source-type">text</span>
+                <span class="material-symbols-outlined chat-mock__source-jump" aria-hidden="true">north_east</span>
+              </span>
+              <span class="chat-mock__source-preview">The cohort comprised 214 participants across four sites…</span>
+            </div>
+          </div>
         </div>
 
-        <div class="landing-feature landing-feature--text landing-feature--02">
+        <div class="landing-feature landing-feature--proof">
+          <div class="proof-card proof-card--summary">
+            <p class="summary-mock__original">
+              "The present investigation sought to evaluate the long-term stability of the proposed architecture
+              under variable thermal loads, employing a longitudinal cohort design across 24 months…"
+            </p>
+            <span class="material-symbols-outlined summary-mock__arrow" aria-hidden="true">arrow_downward</span>
+            <ul class="summary-mock__bullets">
+              <li>24-month longitudinal cohort</li>
+              <li>Stable under variable thermal loads</li>
+              <li>Key finding: architecture holds under stress</li>
+            </ul>
+            <div class="summary-mock__source">Source: full report · Summary</div>
+          </div>
+        </div>
+
+        <div class="landing-feature landing-feature--text landing-feature--02" id="feature-summaries">
           <p class="landing-feature__eyebrow">02 / Summaries</p>
           <h2 class="landing-feature__title">Smart summarization</h2>
           <p class="landing-feature__body">
@@ -64,7 +422,7 @@
           <div class="landing-feature__rule" aria-hidden="true"></div>
         </div>
 
-        <div class="landing-feature landing-feature--text landing-feature--03">
+        <div class="landing-feature landing-feature--text landing-feature--03" id="feature-voice">
           <p class="landing-feature__eyebrow">03 / Voice</p>
           <h2 class="landing-feature__title">AI Text to Speech</h2>
           <p class="landing-feature__body">
@@ -73,16 +431,249 @@
           </p>
           <div class="landing-feature__rule" aria-hidden="true"></div>
         </div>
-        <div class="landing-feature landing-feature--media">
-          <div class="landing-feature__media-box">
-            <img
-              class="landing-feature__media-bg"
-              alt="Abstract macro photography of sound waves vibrating on a dark liquid surface, monochrome high contrast."
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuD96EjCxvUMznd5B2dm8TUjoElHC2xaCQStAa2O2W-jfdhFC_IbLL5RUtrpluixsXE-rB0dmGJsFUbt2p3UgHY4NcpUAF5l6vFU5y0tBXLy56_hHCAm1gxLAFDx2F8HT8tX3ng27jqNi8delyaGDLQ8ZDx24uIYVT3nWb9PetMeX8_rzMSk5M-BpSm-2eEltEc-jQm5UdWz_Hm7M5VHqUJPsaFUMHxKFYmjF5gUJ2qDF1oQoh_hhKJGDyK3ql6mlo2ZreNKLJKusOA"
-            />
-            <span class="material-symbols-outlined landing-feature__icon landing-feature__icon--overlay" aria-hidden="true"
-              >graphic_eq</span
-            >
+        <div class="landing-feature landing-feature--proof">
+          <div class="proof-card proof-card--audio">
+            <div class="audio-mock">
+              <span class="material-symbols-outlined audio-mock__play" aria-hidden="true">play_circle</span>
+              <div class="audio-mock__wave" aria-hidden="true">
+                <span></span><span></span><span></span><span></span><span></span><span></span><span></span
+                ><span></span><span></span><span></span><span></span><span></span><span></span><span></span
+                ><span></span><span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <div class="audio-mock__meta">
+                <span class="audio-mock__name">Report summary</span>
+                <span class="audio-mock__time">2:14</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-compare" id="compare">
+      <div class="landing-compare__inner">
+        <div class="landing-compare__head">
+          <p class="landing-compare__eyebrow">Why it's different</p>
+          <h2 class="landing-compare__title">Built for documents. Not general chat.</h2>
+          <p class="landing-compare__lead">
+            ChatGPT and Claude are brilliant generalists. Understanding Notes is built for one thing: reading your
+            documents — text, scans, tables, and figures — and answering from what's actually there.
+          </p>
+        </div>
+        <div class="landing-compare__table-wrap">
+          <table class="landing-compare__table">
+            <thead>
+              <tr>
+                <th class="landing-compare__sticky" scope="col">Capability</th>
+                <th class="landing-compare__brand" scope="col">Understanding Notes</th>
+                <th scope="col">ChatGPT &amp; Claude</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="landing-compare__group">
+                <td colspan="3">Documents</td>
+              </tr>
+              <tr>
+                <td class="landing-compare__sticky">Reads PDFs end-to-end</td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--full" title="PDFs are parsed end-to-end: structure, tables, and figures are indexed.">✓</i>
+                    <span>Built-in document pipeline</span>
+                  </span>
+                </td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--partial">◐</i>
+                    <span>Chat attachment — no document indexing</span>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td class="landing-compare__sticky">Scanned &amp; handwritten pages (OCR)</td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--full" title="Scanned and image-based PDFs are auto-detected and routed through OCR.">✓</i>
+                    <span>Automatic OCR</span>
+                  </span>
+                </td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--none">✕</i>
+                    <span>No dedicated OCR pipeline</span>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td class="landing-compare__sticky">Answers across your whole library</td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--full" title="Uploads are indexed, so questions can be answered across thousands of files.">✓</i>
+                    <span>Ask across every upload</span>
+                  </span>
+                </td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--none">✕</i>
+                    <span>Limited to one conversation</span>
+                  </span>
+                </td>
+              </tr>
+              <tr class="landing-compare__group">
+                <td colspan="3">Tables</td>
+              </tr>
+              <tr>
+                <td class="landing-compare__sticky">Extracts tables as structured data</td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--full" title="Tables are parsed into rows and columns and stored with their structure.">✓</i>
+                    <span>Rows &amp; columns parsed</span>
+                  </span>
+                </td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--partial">◐</i>
+                    <span>Struggles with complex layouts</span>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td class="landing-compare__sticky">Cites answers to tables</td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--full" title="Answers point to the exact table and page.">✓</i>
+                    <span>Exact table &amp; page</span>
+                  </span>
+                </td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--none">✕</i>
+                    <span>No guaranteed citation</span>
+                  </span>
+                </td>
+              </tr>
+              <tr class="landing-compare__group">
+                <td colspan="3">Images &amp; figures</td>
+              </tr>
+              <tr>
+                <td class="landing-compare__sticky">Reads figures inside your documents</td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--full" title="Every figure is captioned, described, and indexed automatically.">✓</i>
+                    <span>Figures captioned &amp; indexed</span>
+                  </span>
+                </td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--none">✕</i>
+                    <span>Only images you upload</span>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td class="landing-compare__sticky">Reads charts, axes &amp; legends</td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--full" title="Query-time vision analysis reads charts, axes, and legends on the page.">✓</i>
+                    <span>Reads the actual page</span>
+                  </span>
+                </td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--partial">◐</i>
+                    <span>Pasted images, inconsistent</span>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td class="landing-compare__sticky">Detects signatures, stamps, handwriting</td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--full" title="Vision analysis flags signatures, stamps, and handwriting on the page.">✓</i>
+                    <span>Flagged on the page</span>
+                  </span>
+                </td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--none">✕</i>
+                    <span>Not built for documents</span>
+                  </span>
+                </td>
+              </tr>
+              <tr class="landing-compare__group">
+                <td colspan="3">Trust</td>
+              </tr>
+              <tr>
+                <td class="landing-compare__sticky">Every answer cited to the exact source</td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--full" title="Answers link to the exact passage, table, or figure.">✓</i>
+                    <span>Clickable citation</span>
+                  </span>
+                </td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--none">✕</i>
+                    <span>No guaranteed citation</span>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td class="landing-compare__sticky">Your documents never train models</td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--full" title="User documentation is never used to train models.">✓</i>
+                    <span>Never trained on your data</span>
+                  </span>
+                </td>
+                <td>
+                  <span class="landing-compare__cell">
+                    <i class="landing-compare__mark landing-compare__mark--none">✕</i>
+                    <span>Unless disabled in enterprise settings</span>
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="landing-compare__legend">
+          <span><i class="landing-compare__mark landing-compare__mark--full">✓</i> Full capability</span>
+          <span><i class="landing-compare__mark landing-compare__mark--partial">◐</i> Partial</span>
+          <span><i class="landing-compare__mark landing-compare__mark--none">✕</i> Not built for this</span>
+        </div>
+        <p class="landing-compare__footnote">
+          ChatGPT and Claude are shown together because their document-analysis behavior is equivalent across these
+          criteria; availability varies by plan and model version. Verified against public documentation as of
+          August 2026.
+        </p>
+      </div>
+    </section>
+
+    <section class="landing-security" id="security">
+      <div class="landing-security__inner">
+        <div class="landing-security__left">
+          <p class="landing-security__eyebrow">Security &amp; privacy</p>
+          <h2 class="landing-security__title">Built for private, sovereign work.</h2>
+          <p class="landing-security__body">
+            Your documents stay yours. Sessions are end-to-end encrypted within our private sovereign environment, and
+            Understanding Notes never trains models on your documentation.
+          </p>
+        </div>
+        <div class="landing-security__badges">
+          <div class="landing-security__badge">
+            <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+            <span>End-to-end encrypted</span>
+          </div>
+          <div class="landing-security__badge">
+            <span class="material-symbols-outlined" aria-hidden="true">shield</span>
+            <span>Private sovereign environment</span>
+          </div>
+          <div class="landing-security__badge">
+            <span class="material-symbols-outlined" aria-hidden="true">block</span>
+            <span>No training on your data</span>
+          </div>
+          <div class="landing-security__badge">
+            <span class="material-symbols-outlined" aria-hidden="true">cloud_off</span>
+            <span>Your data stays yours</span>
           </div>
         </div>
       </div>
@@ -91,8 +682,13 @@
     <section class="landing-cta">
       <div class="landing-cta__inner">
         <h2 class="landing-cta__title">Experience Clarity.</h2>
-        <p class="landing-cta__sub">No subscription required for initial inquiry.</p>
-        <a class="landing-btn landing-btn--cta" routerLink="/app">Get Started</a>
+        <p class="landing-cta__sub">Free during preview · No credit card required</p>
+        <a
+          class="landing-btn landing-btn--primary landing-btn--cta"
+          [routerLink]="researchRoute()"
+          [queryParams]="researchQueryParams()"
+          >Begin Research</a
+        >
       </div>
     </section>
   </main>
@@ -100,18 +696,23 @@
   <footer class="landing-footer">
     <div class="landing-footer__top">
       <div class="landing-footer__brand">
-        <span class="landing-footer__name">Lumen</span>
-        <p class="landing-footer__tagline">© 2026 LUMEN RESEARCH. AN EDITORIAL APPROACH TO INTELLIGENCE.</p>
+        <img src="assets/black_transparent.svg" alt="Understanding Notes" class="landing-footer__logo" />
       </div>
       <div class="landing-footer__cols">
         <div class="landing-footer__col">
-          <span class="landing-footer__heading">Inquiry</span>
-          <a class="landing-footer__link landing-footer__link--underline" href="#">Terms of Inquiry</a>
-          <a class="landing-footer__link" href="#">Contact Scholar</a>
+          <h3 class="landing-footer__heading-serif">About</h3>
+          <a class="landing-footer__link landing-footer__link--underline" routerLink="/">Home</a>
+          <a class="landing-footer__link landing-footer__link--underline" href="#what-it-does">What it does</a>
+          <a class="landing-footer__link landing-footer__link--underline" href="#how-it-works">How it works</a>
+          <a class="landing-footer__link landing-footer__link--underline" href="#services">Features</a>
+          <a class="landing-footer__link landing-footer__link--underline" href="#compare">Compare</a>
+          <a class="landing-footer__link landing-footer__link--underline" href="#security">Security</a>
         </div>
         <div class="landing-footer__col">
-          <span class="landing-footer__heading">Privacy</span>
-          <a class="landing-footer__link" href="#">Privacy Protocol</a>
+          <h3 class="landing-footer__heading-serif">Explore</h3>
+          <a class="landing-footer__link landing-footer__link--underline" href="#feature-chat">Chat with documents</a>
+          <a class="landing-footer__link landing-footer__link--underline" href="#feature-summaries">Smart summarization</a>
+          <a class="landing-footer__link landing-footer__link--underline" href="#feature-voice">AI Text to Speech</a>
         </div>
       </div>
     </div>
@@ -120,6 +721,7 @@
         <span class="material-symbols-outlined landing-footer__meta-icon" aria-hidden="true">terminal</span>
         <span class="landing-footer__version">v1.0.4-scholarly</span>
       </div>
+      <p class="landing-footer__tagline">© 2026 UNDERSTANDING NOTES. AN EDITORIAL APPROACH TO INTELLIGENCE.</p>
       <div class="landing-footer__icons">
         <span class="material-symbols-outlined landing-footer__meta-icon" aria-hidden="true">public</span>
         <span class="material-symbols-outlined landing-footer__meta-icon" aria-hidden="true">shield</span>

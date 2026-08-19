@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="65 60 370 395" width="370" height="395">
+  <g fill="#000000">
+    <!-- Row 1 -->
+    <circle cx="150" cy="90" r="22"/>
+    <circle cx="200" cy="90" r="10"/>
+    <circle cx="250" cy="90" r="16"/>
+    <circle cx="300" cy="90" r="10"/>
+    <circle cx="350" cy="90" r="22"/>
+    
+    <!-- Row 2 -->
+    <circle cx="150" cy="140" r="10"/>
+    <circle cx="200" cy="140" r="16"/>
+    <circle cx="250" cy="140" r="10"/>
+    <circle cx="300" cy="140" r="16"/>
+    <circle cx="350" cy="140" r="10"/>
+    
+    <!-- Row 3 -->
+    <circle cx="150" cy="190" r="16"/>
+    <circle cx="200" cy="190" r="10"/>
+    <circle cx="250" cy="190" r="28"/>
+    <circle cx="300" cy="190" r="10"/>
+    <circle cx="350" cy="190" r="16"/>
+    
+    <!-- Row 4 -->
+    <circle cx="150" cy="240" r="10"/>
+    <circle cx="200" cy="240" r="16"/>
+    <circle cx="250" cy="240" r="10"/>
+    <circle cx="300" cy="240" r="16"/>
+    <circle cx="350" cy="240" r="10"/>
+    
+    <!-- Row 5 -->
+    <circle cx="150" cy="290" r="22"/>
+    <circle cx="200" cy="290" r="10"/>
+    <circle cx="250" cy="290" r="16"/>
+    <circle cx="300" cy="290" r="10"/>
+    <circle cx="350" cy="290" r="22"/>
+  </g>
+  <text x="250" y="358" font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="700" letter-spacing="3" fill="#000000" text-anchor="middle">UNDERSTANDING</text>
+  <text x="250" y="438" font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="82" font-weight="900" letter-spacing="2" fill="#000000" text-anchor="middle">NOTES</text>
+</svg>

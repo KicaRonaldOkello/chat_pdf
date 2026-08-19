@@ -90,11 +90,13 @@ async def lifespan(_app: FastAPI):
         _app.state.async_session_maker = None
 
 
-app = FastAPI(title="Chat PDF API", lifespan=lifespan)
+app = FastAPI(title="Understanding Notes API", lifespan=lifespan)
 
 # ── security middleware ───────────────────────────────────────────────────────
 
 _cors_origins = [o.strip() for o in settings.cors_allow_origins.split(",") if o.strip()] or [
+    "https://understandingnotes.com",
+    "https://www.understandingnotes.com",
     "http://localhost:4200",
     "http://127.0.0.1:4200",
 ]

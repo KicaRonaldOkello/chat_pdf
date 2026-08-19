@@ -112,7 +112,7 @@ class Settings(BaseSettings):
     jwt_secret: str = ""  # REQUIRED — set in .env for all environments
     jwt_expires_days: int = 30
 
-    # CORS — comma-separated in env, e.g. CORS_ALLOW_ORIGINS="https://app.example.com,https://cdn.example.com"
+    # CORS — comma-separated in env, e.g. CORS_ALLOW_ORIGINS="https://understandingnotes.com,https://www.understandingnotes.com"
     cors_allow_origins: str = ""
 
     # Database
@@ -129,14 +129,14 @@ class Settings(BaseSettings):
     # Loki log shipping (optional — set LOKI_ENABLED=true and LOKI_URL to activate)
     loki_url: str = ""  # e.g. "http://localhost:3100"
     loki_enabled: bool = False
-    loki_application_label: str = "chat-pdf-backend"
+    loki_application_label: str = "understanding-notes-backend"
 
     # Prometheus metrics endpoint (optional — set PROMETHEUS_ENABLED=true)
     prometheus_enabled: bool = False
 
     # OpenTelemetry (optional — set OTEL_ENABLED=true)
     otel_enabled: bool = False
-    otel_service_name: str = "chat-pdf-backend"
+    otel_service_name: str = "understanding-notes-backend"
     otel_exporter_otlp_endpoint: str = ""  # e.g. "http://localhost:4318"
 
     # Upload limits

@@ -11,7 +11,8 @@ import { authGuard } from './services/auth.guard';
 
 export const routes: Routes = [
   { path: '', component: LandingComponent },
-  { path: 'sign-in', component: AuthPageComponent, title: 'Lumen | Authentication' },
+  { path: 'sign-in', component: AuthPageComponent, title: 'Understanding Notes | Sign In' },
+  { path: 'sign-up', component: AuthPageComponent, data: { mode: 'signup' }, title: 'Understanding Notes | Create Account' },
   {
     path: 'app',
     component: AppShellComponent,

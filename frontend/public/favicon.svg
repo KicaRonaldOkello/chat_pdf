@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 320 320">
+  <rect width="300" height="300" x="0" y="0" rx="48" fill="#18181B"/>
+  <g fill="#00B074">
+    <circle cx="50" cy="50" r="22"/><circle cx="100" cy="50" r="10"/><circle cx="150" cy="50" r="16"/><circle cx="200" cy="50" r="10"/><circle cx="250" cy="50" r="22"/>
+    <circle cx="50" cy="100" r="10"/><circle cx="100" cy="100" r="16"/><circle cx="150" cy="100" r="10"/><circle cx="200" cy="100" r="16"/><circle cx="250" cy="100" r="10"/>
+    <circle cx="50" cy="150" r="16"/><circle cx="100" cy="150" r="10"/><circle cx="150" cy="150" r="28"/><circle cx="200" cy="150" r="10"/><circle cx="250" cy="150" r="16"/>
+    <circle cx="50" cy="200" r="10"/><circle cx="100" cy="200" r="16"/><circle cx="150" cy="200" r="10"/><circle cx="200" cy="200" r="16"/><circle cx="250" cy="200" r="10"/>
+    <circle cx="50" cy="250" r="22"/><circle cx="100" cy="250" r="10"/><circle cx="150" cy="250" r="16"/><circle cx="200" cy="250" r="10"/><circle cx="250" cy="250" r="22"/>
+  </g>
+</svg>

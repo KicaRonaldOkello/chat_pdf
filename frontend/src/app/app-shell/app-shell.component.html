@@ -2,8 +2,15 @@
   <aside id="app-sidebar" class="sidebar lumen-sidebar" [class.sidebar--collapsed]="sidebarCollapsed">
     @if (!sidebarCollapsed) {
       <div class="lumen-sidebar__brand">
-        <h3 class="lumen-sidebar__brand-title">Research Lab</h3>
-        <p class="lumen-sidebar__brand-sub">Lumen AI Engine</p>
+        <a routerLink="/" class="lumen-sidebar__brand-link">
+          <img src="assets/color_logo_on_white.svg" alt="Understanding Notes" class="lumen-sidebar__logo" />
+        </a>
+      </div>
+    } @else {
+      <div class="lumen-sidebar__brand lumen-sidebar__brand--collapsed">
+        <a routerLink="/" class="lumen-sidebar__brand-link">
+          <img src="assets/symbol_only.svg" alt="Understanding Notes" class="lumen-sidebar__logo-symbol" />
+        </a>
       </div>
     }
 

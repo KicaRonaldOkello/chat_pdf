@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 450" width="500" height="450">
+  <g fill="#00B074">
+    <circle cx="150" cy="50" r="22"/><circle cx="200" cy="50" r="10"/><circle cx="250" cy="50" r="16"/><circle cx="300" cy="50" r="10"/><circle cx="350" cy="50" r="22"/>
+    <circle cx="150" cy="100" r="10"/><circle cx="200" cy="100" r="16"/><circle cx="250" cy="100" r="10"/><circle cx="300" cy="100" r="16"/><circle cx="350" cy="100" r="10"/>
+    <circle cx="150" cy="150" r="16"/><circle cx="200" cy="150" r="10"/><circle cx="250" cy="150" r="28"/><circle cx="300" cy="150" r="10"/><circle cx="350" cy="150" r="16"/>
+    <circle cx="150" cy="200" r="10"/><circle cx="200" cy="200" r="16"/><circle cx="250" cy="200" r="10"/><circle cx="300" cy="200" r="16"/><circle cx="350" cy="200" r="10"/>
+    <circle cx="150" cy="250" r="22"/><circle cx="200" cy="250" r="10"/><circle cx="250" cy="250" r="16"/><circle cx="300" cy="250" r="10"/><circle cx="350" cy="250" r="22"/>
+  </g>
+  <text x="250" y="320" font-family="'Inter', sans-serif" font-size="28" font-weight="500" letter-spacing="4" fill="#FFFFFF" text-anchor="middle">UNDERSTANDING</text>
+  <text x="250" y="400" font-family="'Inter', sans-serif" font-size="78" font-weight="700" letter-spacing="3" fill="#FFFFFF" text-anchor="middle">NOTES</text>
+</svg>
