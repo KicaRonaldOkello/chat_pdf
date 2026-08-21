@@ -22,6 +22,7 @@ export class PdfScrollManager {
   private diagnosticMode = false;
 
   private onPageChangeCallback?: (page: number) => void;
+  private onScrollCallback?: () => void;
   private hostElement?: HTMLElement;
 
   /**
@@ -31,11 +32,13 @@ export class PdfScrollManager {
    */
   setupScrollListener(
     host: HTMLElement,
-    onPageChange?: (page: number) => void
+    onPageChange?: (page: number) => void,
+    onScroll?: () => void
   ): void {
     this.disconnectScrollListener();
     this.hostElement = host;
     this.onPageChangeCallback = onPageChange;
+    this.onScrollCallback = onScroll;
     host.addEventListener('scroll', this.handleScroll, { passive: true });
     this.attachPageObservers(host);
   }
@@ -49,6 +52,7 @@ export class PdfScrollManager {
     }
     this.disconnectPageObserver();
     this.hostElement = undefined;
+    this.onScrollCallback = undefined;
   }
 
   /**
@@ -217,5 +221,6 @@ export class PdfScrollManager {
     if (this.scrollLock) {
       return;
     }
+    this.onScrollCallback?.();
   };
 }

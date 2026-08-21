@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -53,6 +53,22 @@ class UserRepository:
         ).returning(User)
         result = await self._session.execute(stmt)
         u = result.scalars().one()
+        return UserRow(
+            user_id=u.user_id,
+            email=u.email,
+            name=u.name,
+            picture=u.picture,
+            created_at=u.created_at,
+            last_seen_at=u.last_seen_at,
+        )
+
+    async def get_by_email(self, email: str) -> UserRow | None:
+        result = await self._session.execute(
+            select(User).where(User.email == email).limit(1)
+        )
+        u = result.scalars().first()
+        if u is None:
+            return None
         return UserRow(
             user_id=u.user_id,
             email=u.email,

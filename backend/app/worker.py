@@ -136,11 +136,17 @@ async def run_worker(
     stop_event: asyncio.Event | None = None,
     processor: ProcessorFn = process_document,
 ) -> None:
-    """Poll loop with bounded document concurrency and startup recovery."""
+    """Poll loop with bounded document concurrency and startup recovery.
+
+    Up to ``worker_concurrency`` documents are processed concurrently: the
+    loop keeps that many claim tasks in flight, so a slow document (or a
+    slow background enrichment) never blocks new uploads from being claimed.
+    """
     from app.document_data import document_db_session
 
     stop = stop_event or asyncio.Event()
-    sem = asyncio.Semaphore(max(1, settings.worker_concurrency))
+    concurrency = max(1, settings.worker_concurrency)
+    sem = asyncio.Semaphore(concurrency)
 
     # Startup recovery: never leave documents stranded in extracting/tables/…
     async with document_db_session() as (session, repo):
@@ -148,35 +154,49 @@ async def run_worker(
         await recover_stale(repo)
         await session.commit()
 
+    async def _process_one() -> bool:
+        async with sem:
+            async with document_db_session() as (session, repo):
+                try:
+                    outcome = await run_worker_once(
+                        repo,
+                        processor=processor,
+                        commit=session.commit,
+                    )
+                    await session.commit()
+                except Exception:
+                    await session.rollback()
+                    raise
+                return outcome is not None
+
+    pending: set[asyncio.Task[bool]] = set()
+
     while not stop.is_set():
         processed_any = False
+
+        # Reap finished tasks; surface unexpected failures.
+        for task in list(pending):
+            if not task.done():
+                continue
+            pending.discard(task)
+            try:
+                processed_any = processed_any or task.result()
+            except Exception:
+                log.exception("worker: document task failed; continuing")
+
+        # Expire stale leases once per cycle (safety net for dead workers).
         try:
             async with document_db_session() as (session, repo):
                 await repo.expire_stale_leases(
                     lease_seconds=settings.worker_claim_timeout_seconds
                 )
                 await session.commit()
-
-                async def _process_one() -> bool:
-                    async with (
-                        sem,
-                        document_db_session() as (proc_session, proc_repo),
-                    ):
-                        try:
-                            outcome = await run_worker_once(
-                                proc_repo,
-                                processor=processor,
-                                commit=proc_session.commit,
-                            )
-                            await proc_session.commit()
-                        except Exception:
-                            await proc_session.rollback()
-                            raise
-                        return outcome is not None
-
-                processed_any = await _process_one()
         except Exception:
             log.exception("worker: poll cycle failed; continuing")
+
+        # Keep up to `concurrency` documents in flight.
+        while len(pending) < concurrency and not stop.is_set():
+            pending.add(asyncio.create_task(_process_one()))
 
         if not processed_any or stop.is_set():
             try:

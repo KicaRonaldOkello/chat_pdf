@@ -1,0 +1,63 @@
+<div class="legal-page">
+  <header class="legal-header">
+    <div class="legal-header__inner">
+      <a class="legal-logo" routerLink="/">
+        <img src="assets/color_logo_on_white.svg" alt="Understanding Notes" class="legal-logo__img" />
+      </a>
+      <nav class="legal-nav" aria-label="Primary">
+        <a class="legal-nav__link" routerLink="/">Home</a>
+        <a
+          class="legal-nav__link"
+          routerLink="/pricing"
+          routerLinkActive="legal-nav__link--active"
+          [routerLinkActiveOptions]="{ exact: true }"
+          >Pricing</a
+        >
+        <a class="legal-nav__link" routerLink="/sign-in">Sign in</a>
+      </nav>
+      <a
+        class="legal-btn legal-btn--primary legal-btn--sm"
+        routerLink="/sign-up"
+        [queryParams]="{ returnUrl: '/app' }"
+        >Begin Research</a
+      >
+    </div>
+  </header>
+
+  <main class="legal-main">
+    <header class="legal-hero">
+      <p class="legal-hero__eyebrow">Legal</p>
+      <h1 class="legal-hero__title">{{ doc.title }}</h1>
+      <p class="legal-hero__updated">{{ doc.updated }}</p>
+    </header>
+
+    <article class="legal-doc">
+      @for (paragraph of doc.intro; track paragraph) {
+        <p class="legal-doc__intro">{{ paragraph }}</p>
+      }
+
+      @for (section of doc.sections; track section.heading; let i = $index) {
+        <section class="legal-section">
+          <h2 class="legal-section__heading">{{ i + 1 }}. {{ section.heading }}</h2>
+          @for (paragraph of section.paragraphs; track paragraph) {
+            <p class="legal-section__paragraph">{{ paragraph }}</p>
+          }
+        </section>
+      }
+    </article>
+  </main>
+
+  <footer class="legal-footer">
+    <div class="legal-footer__inner">
+      <img src="assets/black_transparent.svg" alt="Understanding Notes" class="legal-footer__logo" />
+      <div class="legal-footer__links">
+        <a class="legal-footer__link" routerLink="/">Home</a>
+        <a class="legal-footer__link" routerLink="/pricing">Pricing</a>
+        <a class="legal-footer__link" routerLink="/privacy">Privacy Policy</a>
+        <a class="legal-footer__link" routerLink="/terms">Terms of Service</a>
+        <a class="legal-footer__link" routerLink="/sign-in">Sign in</a>
+      </div>
+      <p class="legal-footer__copy">© 2026 Understanding Notes. All rights reserved.</p>
+    </div>
+  </footer>
+</div>

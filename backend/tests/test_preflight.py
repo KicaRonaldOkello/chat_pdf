@@ -13,6 +13,7 @@ from app.processing.preflight import (
     DocumentPreflight,
     PreflightError,
     classify_pdf,
+    missing_pages,
     quality_gate,
 )
 from app.processing.structure import partition
@@ -284,6 +285,15 @@ def test_quality_gate_warns_no_output_at_all() -> None:
     assert any("no usable text or images" in w for w in warnings)
 
 
+def test_missing_pages_reports_gaps() -> None:
+    elements = [
+        _element("NarrativeText", "Solid page one text. " * 12, 1),
+        _element("NarrativeText", "Solid page three text. " * 12, 3),
+    ]
+
+    assert missing_pages(elements, expected_pages=4) == [2, 4]
+
+
 def test_partition_uses_preflight_route_and_retries_fast_low_quality(
     tmp_path: Path,
 ) -> None:
@@ -299,13 +309,16 @@ def test_partition_uses_preflight_route_and_retries_fast_low_quality(
     ]
     bad = [_element("NarrativeText", "Tiny", 1)]
 
+    ocr_events: list[tuple[str, float, dict]] = []
     with (
         patch("unstructured.partition.pdf.partition_pdf") as partition_pdf,
         patch.dict("os.environ", {}, clear=True),
     ):
         partition_pdf.side_effect = [bad, good_two_pages]
         _root, elements, _pages, warnings = partition(
-            tmp_path / "unused.pdf", preflight=preflight
+            tmp_path / "unused.pdf",
+            preflight=preflight,
+            on_stage=lambda s, p, e: ocr_events.append((s, p, e)),
         )
 
     assert partition_pdf.call_count == 2
@@ -313,6 +326,102 @@ def test_partition_uses_preflight_route_and_retries_fast_low_quality(
     assert partition_pdf.call_args_list[1].kwargs["strategy"] == "hi_res"
     assert elements
     assert any("layout-aware pass" in w for w in warnings)
+    assert ocr_events and "OCR" in ocr_events[0][0]
+    assert ocr_events[0][1] == 0.25
+    assert ocr_events[0][2] == {"ocr_pages": 2}
+
+
+def test_partition_retries_only_missing_pages(tmp_path: Path) -> None:
+    preflight = DocumentPreflight(
+        classification="text",
+        route="fast",
+        confidence="high",
+        num_pages=10,
+    )
+    good_8 = [
+        _element("NarrativeText", f"Solid page {p} text. " * 12, p) for p in range(1, 9)
+    ]
+
+    ocr_events: list[tuple[str, float, dict]] = []
+    with (
+        patch("unstructured.partition.pdf.partition_pdf") as partition_pdf,
+        patch("app.processing.structure._partition_pages_hi_res") as targeted_ocr,
+        patch.dict("os.environ", {}, clear=True),
+    ):
+        partition_pdf.return_value = good_8
+        targeted_ocr.return_value = [
+            _element("NarrativeText", f"Recovered page {p} text. " * 12, p)
+            for p in (9, 10)
+        ]
+        _root, elements, _pages, warnings = partition(
+            tmp_path / "unused.pdf",
+            preflight=preflight,
+            on_stage=lambda s, p, e: ocr_events.append((s, p, e)),
+        )
+
+    partition_pdf.assert_called_once()  # fast only — no full-document OCR
+    assert partition_pdf.call_args.kwargs["strategy"] == "fast"
+    targeted_ocr.assert_called_once()
+    pages = sorted({el.page for el in elements})
+    assert 9 in pages and 10 in pages
+    assert any("layout-aware pass was used on those pages" in w for w in warnings)
+    assert ocr_events and "OCR" in ocr_events[0][0]
+    assert ocr_events[0][2] == {"ocr_pages": 2}
+
+
+def test_partition_notifies_ocr_for_hi_res_primary(tmp_path: Path) -> None:
+    preflight_doc = DocumentPreflight(
+        classification="scanned",
+        route="hi_res",
+        confidence="high",
+        num_pages=2,
+    )
+    events: list[str] = []
+
+    with (
+        patch("unstructured.partition.pdf.partition_pdf") as partition_pdf,
+        patch.dict("os.environ", {}, clear=True),
+    ):
+        partition_pdf.side_effect = lambda **_: events.append("partition") or [
+            _element("NarrativeText", "Solid page text. " * 12, 1)
+        ]
+        _root, _elements, _pages, _warnings = partition(
+            tmp_path / "unused.pdf",
+            preflight=preflight_doc,
+            on_stage=lambda s, p, e: events.append("ocr"),
+        )
+
+    assert "ocr" in events
+    assert events.index("ocr") < events.index("partition")
+    assert partition_pdf.call_args.kwargs["strategy"] == "hi_res"
+
+
+def test_partition_skips_retry_when_few_pages_missing(tmp_path: Path) -> None:
+    preflight = DocumentPreflight(
+        classification="text",
+        route="fast",
+        confidence="high",
+        num_pages=100,
+    )
+    good_98 = [
+        _element("NarrativeText", f"Solid page {p} text. " * 12, p)
+        for p in range(1, 99)
+    ]
+
+    with (
+        patch("unstructured.partition.pdf.partition_pdf") as partition_pdf,
+        patch("app.processing.structure._partition_pages_hi_res") as targeted_ocr,
+        patch.dict("os.environ", {}, clear=True),
+    ):
+        partition_pdf.return_value = good_98
+        _root, elements, _pages, warnings = partition(
+            tmp_path / "unused.pdf", preflight=preflight
+        )
+
+    partition_pdf.assert_called_once()  # no retry at all
+    targeted_ocr.assert_not_called()
+    assert elements  # fast output kept
+    assert any("2 of 100 pages" in w for w in warnings)
 
 
 def test_partition_does_not_retry_when_fast_quality_ok(tmp_path: Path) -> None:

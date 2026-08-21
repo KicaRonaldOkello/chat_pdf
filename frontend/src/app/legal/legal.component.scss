@@ -1,0 +1,257 @@
+// Legal pages — matches the Understanding Notes design system.
+
+$color-primary-green: #00B074;
+$color-primary-green-hover: #009663;
+$color-bg: #FFFFFF;
+$color-secondary: #5e5e5e;
+$color-border: #E4E4E7;
+$bp-md: 768px;
+$max-content: 1200px;
+
+:host {
+  display: block;
+  min-height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.legal-page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: $color-bg;
+  color: #000;
+  font-family: Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.legal-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.legal-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  max-width: $max-content;
+  margin: 0 auto;
+  padding: 0.875rem 3rem;
+}
+
+@media (max-width: 767px) {
+  .legal-header__inner {
+    padding: 0.875rem 1.25rem;
+  }
+}
+
+.legal-logo {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.legal-logo__img {
+  height: 64px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.legal-nav {
+  display: none;
+  align-items: center;
+  gap: 2rem;
+
+  @media (min-width: $bp-md) {
+    display: flex;
+  }
+}
+
+.legal-nav__link {
+  font-size: 0.9375rem;
+  font-weight: 400;
+  color: #18181b;
+  text-decoration: none;
+  padding: 0.25rem 0;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: $color-primary-green;
+  }
+
+  &--active {
+    font-weight: 500;
+    color: #000;
+    border-bottom: 2px solid #000;
+    padding-bottom: 2px;
+  }
+}
+
+.legal-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  font-family: Inter, system-ui, sans-serif;
+  font-weight: 500;
+  text-decoration: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+
+  &--primary {
+    background: $color-primary-green;
+    color: #fff;
+
+    &:hover {
+      background: $color-primary-green-hover;
+    }
+  }
+
+  &--sm {
+    padding: 0.65rem 1.4rem;
+    font-size: 0.875rem;
+    border-radius: 6px;
+  }
+}
+
+.legal-main {
+  flex: 1;
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 5rem 3rem 7rem;
+  box-sizing: border-box;
+}
+
+@media (max-width: 767px) {
+  .legal-main {
+    padding: 3.5rem 1.25rem 5rem;
+  }
+}
+
+.legal-hero {
+  margin-bottom: 3rem;
+}
+
+.legal-hero__eyebrow {
+  margin: 0 0 1rem;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: $color-primary-green;
+}
+
+.legal-hero__title {
+  margin: 0 0 1rem;
+  font-family: Newsreader, Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(2.25rem, 4vw, 3.25rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: #000;
+}
+
+.legal-hero__updated {
+  margin: 0;
+  font-size: 0.875rem;
+  color: $color-secondary;
+}
+
+.legal-doc__intro {
+  margin: 0 0 1.5rem;
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  color: #3f3f46;
+}
+
+.legal-section {
+  margin-top: 2.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid $color-border;
+}
+
+.legal-section__heading {
+  margin: 0 0 1rem;
+  font-family: Newsreader, Georgia, serif;
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: #000;
+}
+
+.legal-section__paragraph {
+  margin: 0 0 1rem;
+  font-size: 0.975rem;
+  line-height: 1.75;
+  color: #3f3f46;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.legal-footer {
+  width: 100%;
+  background: #eeeeee;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.legal-footer__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  max-width: $max-content;
+  margin: 0 auto;
+  padding: 3rem;
+  text-align: center;
+
+  @media (min-width: $bp-md) {
+    flex-direction: row;
+    justify-content: space-between;
+    text-align: left;
+  }
+}
+
+.legal-footer__logo {
+  height: 72px;
+  width: auto;
+  object-fit: contain;
+}
+
+.legal-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+.legal-footer__link {
+  font-size: 0.875rem;
+  color: #18181b;
+  text-decoration: none;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: $color-primary-green;
+  }
+}
+
+.legal-footer__copy {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #71717a;
+}

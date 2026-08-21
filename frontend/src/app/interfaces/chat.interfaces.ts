@@ -108,8 +108,24 @@ export interface ChatStreamMeta {
   retrieved?: RetrievedSource[];
 }
 
+export interface ChatLimitNotice {
+  limit_type?: string;
+  used?: number;
+  limit?: number;
+}
+
 export interface ChatStreamHandlers {
   onStage?: (stage: string, detail?: string) => void;
   onDelta: (text: string) => void;
   onMeta?: (meta: ChatStreamMeta) => void;
+  onLimitReached?: (notice: ChatLimitNotice) => void;
+  onUsage?: (usage: ChatUsageEvent) => void;
+}
+
+export interface ChatUsageEvent {
+  usage_date: string;
+  ai_words: number;
+  uploads: number;
+  upload_bytes: number;
+  limit: number;
 }

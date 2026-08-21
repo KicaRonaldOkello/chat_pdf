@@ -20,6 +20,7 @@ import {
   RetrievedSource
 } from '../interfaces';
 import { ChatService } from './chat.service';
+import { BillingService } from './billing.service';
 import { LumenNotifyService } from './lumen-notify.service';
 
 @Injectable({ providedIn: 'root' })
@@ -52,6 +53,7 @@ export class DocumentSessionService implements OnDestroy {
   onSessionChange?: () => void;
   private readonly chatService = inject(ChatService);
   private readonly notify = inject(LumenNotifyService);
+  private readonly billing = inject(BillingService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private statusPollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -153,7 +155,7 @@ export class DocumentSessionService implements OnDestroy {
       }
       const s = pending[0]!.status!;
       const pct = Math.round((s.progress ?? 0) * 100);
-      return `Processing ${s.filename} - ${s.stage} (${pct}%)`;
+      return `Processing ${s.filename} - ${this.processingStageLabel(s.stage)} (${pct}%)`;
     }
     const err = this.openDocuments.find((d) =>
       DocumentSessionService.isErrorStatus(d.status?.status)
@@ -162,6 +164,12 @@ export class DocumentSessionService implements OnDestroy {
       return `Processing failed: ${err.status.error ?? 'unknown error'}`;
     }
     return '';
+  }
+
+  private processingStageLabel(stage: string): string {
+    return stage.toLowerCase().includes('ocr')
+      ? 'images detected — running OCR, this can take a few minutes'
+      : stage;
   }
 
   static readonly CHAT_RAIL_MIN = CHAT_RAIL_MIN;
@@ -302,16 +310,37 @@ export class DocumentSessionService implements OnDestroy {
   }
 
   getDocumentViewPage(id: string | null): number | undefined {
-    if (!id) {
-      return undefined;
-    }
-    return this.openDocuments.find((d) => d.id === id)?.pdfViewPage;
+    return this.getDocumentViewState(id).page;
   }
 
   setDocumentViewPage(id: string, page: number): void {
+    this.setDocumentViewState(id, { page });
+  }
+
+  /** Per-document reader state (page + exact scroll offset). */
+  getDocumentViewState(id: string | null): { page?: number; scrollTop?: number } {
+    if (!id) {
+      return {};
+    }
     const o = this.openDocuments.find((d) => d.id === id);
-    if (o && page >= 1) {
-      o.pdfViewPage = page;
+    return o
+      ? { page: o.pdfViewPage, scrollTop: o.pdfViewScrollTop }
+      : {};
+  }
+
+  setDocumentViewState(
+    id: string,
+    state: { page?: number; scrollTop?: number }
+  ): void {
+    const o = this.openDocuments.find((d) => d.id === id);
+    if (!o) {
+      return;
+    }
+    if (state.page !== undefined && state.page >= 1) {
+      o.pdfViewPage = state.page;
+    }
+    if (state.scrollTop !== undefined && state.scrollTop >= 0) {
+      o.pdfViewScrollTop = state.scrollTop;
     }
   }
 
@@ -409,13 +438,16 @@ export class DocumentSessionService implements OnDestroy {
     this.activeRemoteOpenId = null;
     this.uploading = true;
     const wantAppend = opts.append;
+    const maxUploadBytes =
+      (await this.billing.load())?.plan.max_upload_bytes_per_import ??
+      MAX_PDF_UPLOAD_BYTES;
     let hasUploadedInThisRun = false;
     let uploaded = 0;
     try {
       for (const file of files) {
-        if (file.size > MAX_PDF_UPLOAD_BYTES) {
+        if (file.size > maxUploadBytes) {
           this.notify.error(
-            `${file.name}: each PDF must be at most ${MAX_PDF_UPLOAD_BYTES / (1024 * 1024)} MB.`,
+            `${file.name}: each PDF must be at most ${maxUploadBytes / (1024 * 1024)} MB on your plan.`,
             6000
           );
           continue;
@@ -425,9 +457,18 @@ export class DocumentSessionService implements OnDestroy {
         try {
           res = await firstValueFrom(this.chatService.uploadPdf(file));
         } catch (err: unknown) {
+          if (err instanceof HttpErrorResponse && err.status === 402) {
+            const http = err as { error?: { detail?: string } };
+            this.notify.warning(
+              http?.error?.detail ??
+                'Daily upload limit reached. Upgrade to Plus or Pro for more.',
+              9000
+            );
+            continue;
+          }
           if (err instanceof HttpErrorResponse && err.status === 413) {
             this.notify.error(
-              `${file.name}: file is too large (max ${MAX_PDF_UPLOAD_BYTES / (1024 * 1024)} MB).`,
+              `${file.name}: file is too large (max ${maxUploadBytes / (1024 * 1024)} MB on your plan).`,
               6000
             );
             continue;
@@ -527,9 +568,31 @@ export class DocumentSessionService implements OnDestroy {
         onMeta: (meta) => {
           this.messageMeta[assistantIndex] = meta;
           this.onSessionChange?.();
+        },
+        onLimitReached: () => {
+          this.notify.warning(
+            'Daily word limit reached. Upgrade to Plus or Pro for more.',
+            9000
+          );
+          this.onSessionChange?.();
+        },
+        onUsage: (usage) => {
+          this.billing.applyUsageEvent(usage);
+          this.onSessionChange?.();
         }
       });
     } catch (err: unknown) {
+      const streamErr = err as { status?: number; code?: string };
+      if (streamErr.status === 402 || streamErr.code === 'usage_limit') {
+        this.notify.warning(
+          'Daily word limit reached. Upgrade to Plus or Pro to keep going.',
+          9000
+        );
+        this.messages.splice(assistantIndex - 1, 2);
+        this.userInput = text;
+        this.onSessionChange?.();
+        return;
+      }
       const msg = err instanceof Error ? err.message : String(err);
       this.notify.error(msg || 'Chat request failed');
       this.messages.splice(assistantIndex - 1, 2);

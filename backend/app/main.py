@@ -23,10 +23,12 @@ logging.getLogger("app.processing").setLevel(logging.INFO)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 import app.runtime as app_runtime
-from app.api.routes import auth, chat, documents, upload
+from app.api.routes import auth, billing, chat, documents, upload, webhooks
+from app.billing.enforcement import UsageLimitExceeded
 from app.db import close_db_engine, open_db_engine
 from app.settings import settings
 
@@ -36,8 +38,13 @@ log = logging.getLogger("app.main")
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     if settings.storage_backend == "s3" and not settings.s3_bucket:
-        raise RuntimeError("S3_BUCKET is empty; set S3_BUCKET in the environment when using S3 storage backend.")
-    if settings.storage_backend == "azure" and not settings.azure_storage_connection_string:
+        raise RuntimeError(
+            "S3_BUCKET is empty; set S3_BUCKET in the environment when using S3 storage backend."
+        )
+    if (
+        settings.storage_backend == "azure"
+        and not settings.azure_storage_connection_string
+    ):
         raise RuntimeError(
             "AZURE_STORAGE_CONNECTION_STRING is empty; set it when using Azure storage backend."
         )
@@ -55,7 +62,9 @@ async def lifespan(_app: FastAPI):
     try:
         async with _app.state.db_engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-        success_msg = f"✓ Database connection successful! (Backend: {settings.storage_backend})"
+        success_msg = (
+            f"✓ Database connection successful! (Backend: {settings.storage_backend})"
+        )
         log.info(success_msg)
         print(success_msg)
     except Exception as e:
@@ -81,6 +90,21 @@ async def lifespan(_app: FastAPI):
         )
         _instrument_fastapi_app(_app)
 
+    # Re-apply catalog prices so the plans table can't drift from code.
+    try:
+        sm = getattr(_app.state, "async_session_maker", None)
+        if sm is not None:
+            from app.billing.plan_catalog import reconcile_plan_catalog
+            from app.db.repositories import PlanRepository
+
+            async with sm() as session:
+                changed = await reconcile_plan_catalog(PlanRepository(session))
+                await session.commit()
+            if changed:
+                log.info("plan catalog: reconciled %d pricing row(s)", changed)
+    except Exception:
+        log.exception("plan catalog reconciliation failed; continuing")
+
     try:
         yield
     finally:
@@ -94,7 +118,9 @@ app = FastAPI(title="Understanding Notes API", lifespan=lifespan)
 
 # ── security middleware ───────────────────────────────────────────────────────
 
-_cors_origins = [o.strip() for o in settings.cors_allow_origins.split(",") if o.strip()] or [
+_cors_origins = [
+    o.strip() for o in settings.cors_allow_origins.split(",") if o.strip()
+] or [
     "https://understandingnotes.com",
     "https://www.understandingnotes.com",
     "http://localhost:4200",
@@ -109,14 +135,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Rate limiting (in-memory, per-IP)
-from slowapi import Limiter
 from slowapi import _rate_limit_exceeded_handler as _rl_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from slowapi.util import get_remote_address
 
-limiter = Limiter(key_func=get_remote_address)
+from app.rate_limit import limiter
+
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
 app.add_exception_handler(RateLimitExceeded, _rl_handler)
@@ -139,12 +163,34 @@ async def _add_security_headers(request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     return response
 
+
+# ── plan-limit enforcement ───────────────────────────────────────────────────
+
+
+@app.exception_handler(UsageLimitExceeded)
+async def _usage_limit_handler(_request, exc: UsageLimitExceeded) -> JSONResponse:
+    """Render plan-limit blocks as HTTP 402 with an upgrade payload."""
+    return JSONResponse(
+        status_code=402,
+        content={
+            "detail": exc.message,
+            "code": "usage_limit",
+            "limit_type": exc.limit_type,
+            "used": exc.used,
+            "limit": exc.limit,
+            "upgrade": exc.upgrade,
+        },
+    )
+
+
 # ── domain routers ───────────────────────────────────────────────────────────
 
 app.include_router(auth.router)
+app.include_router(billing.router)
 app.include_router(documents.router)
 app.include_router(upload.router)
 app.include_router(chat.router)
+app.include_router(webhooks.router)
 
 
 # ── health ───────────────────────────────────────────────────────────────────

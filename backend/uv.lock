@@ -426,6 +426,7 @@ dependencies = [
     { name = "azure-storage-blob" },
     { name = "boto3" },
     { name = "camelot-py" },
+    { name = "dodopayments", extra = ["webhooks"] },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "langchain-core" },
@@ -473,6 +474,7 @@ requires-dist = [
     { name = "azure-storage-blob", specifier = ">=12.30.0" },
     { name = "boto3", specifier = ">=1.35.0" },
     { name = "camelot-py", specifier = ">=1.0.0" },
+    { name = "dodopayments", extras = ["webhooks"], specifier = ">=1.113.0" },
     { name = "fastapi", specifier = "==0.115.6" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "langchain-core", specifier = ">=0.3.20" },
@@ -764,6 +766,28 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/fc/f8/98eea607f65de6527f8a2e8885fc8015d3e6f5775df186e443e0964a11c3/distro-1.9.0.tar.gz", hash = "sha256:2fa77c6fd8940f116ee1d6b94a2f90b13b5ea8d019b98bc8bafdcabcdd9bdbed", size = 60722, upload-time = "2023-12-24T09:54:32.31Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/12/b3/231ffd4ab1fc9d679809f356cebee130ac7daa00d6d6f3206dd4fd137e9e/distro-1.9.0-py3-none-any.whl", hash = "sha256:7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2", size = 20277, upload-time = "2023-12-24T09:54:30.421Z" },
+]
+
+[[package]]
+name = "dodopayments"
+version = "1.113.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "distro" },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "sniffio" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2c/d7/c79eeab8eb9fdfc38413b52f82489f95f900aa4efd171e6f38b5ed47562a/dodopayments-1.113.0.tar.gz", hash = "sha256:157f1ee60e18bda1e715ec0498cef6a70fdca454bf7c829ee4d07d4615e1b8e5", size = 290728, upload-time = "2026-08-17T19:01:13.426Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/86/10/5ac92432a35cc176937118c06c8708172b3a59bb453d459deec6a575df6d/dodopayments-1.113.0-py3-none-any.whl", hash = "sha256:49116f5298931ed167164c9d8289e2a2c690c3b01dac0b2982d9a11c6f4291aa", size = 421183, upload-time = "2026-08-17T19:01:12.057Z" },
+]
+
+[package.optional-dependencies]
+webhooks = [
+    { name = "standardwebhooks" },
 ]
 
 [[package]]
@@ -3972,6 +3996,15 @@ wheels = [
 [package.optional-dependencies]
 asyncio = [
     { name = "greenlet" },
+]
+
+[[package]]
+name = "standardwebhooks"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/50/81/a26b812525dd9ad6cc0f6ba2f8eafd5bf595542e319d95123aa92b51bf22/standardwebhooks-1.1.0.tar.gz", hash = "sha256:e5cb66e21a6356ebb9375aeb57f1348583323015808d475a7c1baaa4b718068a", size = 3232, upload-time = "2026-07-21T15:49:51.45Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/21/dc/0cd2bd9a536e61ad0ee9de3b724492a38faa88ce1828fbc15940824664c3/standardwebhooks-1.1.0-py3-none-any.whl", hash = "sha256:9a88d48a1f198be61517fc7ad328cf58ba02b73f0fbd8941d4213e9c0b6c2a61", size = 3538, upload-time = "2026-07-21T15:49:50.519Z" },
 ]
 
 [[package]]

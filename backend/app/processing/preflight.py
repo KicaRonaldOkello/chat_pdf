@@ -223,6 +223,35 @@ def _text_quality(text: str) -> dict[str, Any]:
     }
 
 
+def _page_coverage(elements: list[Any]) -> tuple[set[int], set[int]]:
+    """Return (pages_with_text, pages_with_images) using the same quality rules
+    as the gate, so warnings and page-level retry decisions never diverge."""
+    text_pages: set[int] = set()
+    image_pages: set[int] = set()
+
+    for el in elements:
+        meta = getattr(el, "metadata", None)
+        page = int(getattr(meta, "page_number", None) or 1)
+        text = str(getattr(el, "text", "") or "")
+        category = str(getattr(el, "category", "") or type(el).__name__)
+
+        if text:
+            quality = _text_quality(text)
+            if quality["chars"] >= MIN_TEXT_CHARS and quality["printable_ratio"] >= 0.9:
+                text_pages.add(page)
+        if category in ("Image", "Figure", "Table") or hasattr(meta, "image_path"):
+            image_pages.add(page)
+
+    return text_pages, image_pages
+
+
+def missing_pages(elements: list[Any], expected_pages: int) -> list[int]:
+    """1-indexed pages with no usable text or image output, sorted ascending."""
+    text_pages, image_pages = _page_coverage(elements)
+    present = text_pages | image_pages
+    return sorted(page for page in range(1, expected_pages + 1) if page not in present)
+
+
 def quality_gate(
     elements: list[Any],
     expected_pages: int,
@@ -236,26 +265,14 @@ def quality_gate(
     """
     warnings: list[str] = []
 
-    text_pages: set[int] = set()
-    image_pages: set[int] = set()
-    total_text = 0
-    total_suspicious = 0
-
-    for el in elements:
-        meta = getattr(el, "metadata", None)
-        page = int(getattr(meta, "page_number", None) or 1)
-        text = str(getattr(el, "text", "") or "")
-        category = str(getattr(el, "category", "") or type(el).__name__)
-
-        if text:
-            total_text += len(text)
-            quality = _text_quality(text)
-            if quality["suspicious_repeats"]:
-                total_suspicious += 1
-            if quality["chars"] >= MIN_TEXT_CHARS and quality["printable_ratio"] >= 0.9:
-                text_pages.add(page)
-        if category in ("Image", "Figure", "Table") or hasattr(meta, "image_path"):
-            image_pages.add(page)
+    text_pages, image_pages = _page_coverage(elements)
+    total_text = sum(len(str(getattr(el, "text", "") or "")) for el in elements)
+    total_suspicious = sum(
+        1
+        for el in elements
+        if str(getattr(el, "text", "") or "")
+        and _text_quality(str(getattr(el, "text", "") or ""))["suspicious_repeats"]
+    )
 
     if expected_pages > 0 and not text_pages and not image_pages:
         warnings.append(

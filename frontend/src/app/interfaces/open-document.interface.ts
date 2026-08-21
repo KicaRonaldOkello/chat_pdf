@@ -12,4 +12,6 @@ export interface OpenDocument {
   localUploading?: boolean;
   /** Last page the user was reading; restored when switching back to this tab. */
   pdfViewPage?: number;
+  /** Exact scroll offset for that page; restores the same view on tab switch. */
+  pdfViewScrollTop?: number;
 }
