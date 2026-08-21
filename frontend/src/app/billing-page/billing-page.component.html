@@ -1,0 +1,96 @@
+<main class="billing-page">
+  @if (checkoutOutcome() === 'success') {
+    <div class="billing-banner billing-banner--success" role="status">
+      <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+      <div>
+        <strong>Payment successful!</strong>
+        <p>Your plan is being activated. If it doesn't appear within a minute, check your email for a receipt from Dodo Payments.</p>
+      </div>
+    </div>
+  }
+
+  @if (checkoutOutcome() === 'cancelled') {
+    <div class="billing-banner billing-banner--muted" role="status">
+      <span class="material-symbols-outlined" aria-hidden="true">info</span>
+      <div>
+        <strong>Checkout cancelled</strong>
+        <p>No charges were made. You can come back and choose a plan any time.</p>
+      </div>
+    </div>
+  }
+
+  @if (isPlanProblem()) {
+    <div class="billing-banner billing-banner--error" role="alert">
+      <span class="material-symbols-outlined" aria-hidden="true">error</span>
+      <div>
+        <strong>Plan not active</strong>
+        <p>
+          Your payment didn't go through, so you're currently on Free. Choose a
+          plan to keep full access.
+        </p>
+      </div>
+    </div>
+  }
+
+  @if (loading()) {
+    <p class="billing-page__status">Loading your plan…</p>
+  } @else if (error()) {
+    <p class="billing-page__status billing-page__status--error" role="alert">{{ error() }}</p>
+  } @else {
+    @if (status(); as status) {
+      <section class="billing-card">
+        <div class="billing-card__row">
+          <div>
+            <p class="billing-card__eyebrow">Current plan</p>
+            <h1 class="billing-card__title">{{ status.plan.name }}</h1>
+            <p class="billing-card__subtitle">{{ planSubtitle() }}</p>
+          </div>
+          <div class="billing-card__price">
+            <span class="billing-card__amount">{{ price() }}</span>
+            <span class="billing-card__period">{{ period() }}</span>
+          </div>
+        </div>
+
+        @if (status.subscription; as sub) {
+          <div class="billing-card__meta">
+            <span>Status: <strong>{{ sub.status }}</strong></span>
+            @if (sub.current_period_end && showPeriodDate()) {
+              <span>
+                {{ periodDateLabel() }}:
+                <strong>{{ sub.current_period_end | date: 'mediumDate' }}</strong>
+              </span>
+            }
+            @if (sub.cancel_at_period_end) {
+              <span>Cancels at period end</span>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="billing-card">
+        <h2 class="billing-card__section-title">Today's usage</h2>
+        <div class="billing-meters">
+          @for (meter of meters(); track meter.label) {
+            <div class="billing-meter">
+              <div class="billing-meter__head">
+                <span class="billing-meter__label">{{ meter.label }}</span>
+                <span class="billing-meter__value">
+                  {{ usedLabel(meter) }} / {{ limitLabel(meter) }} {{ meter.unit }}
+                </span>
+              </div>
+              <div class="billing-meter__track" aria-hidden="true">
+                <div class="billing-meter__fill" [style.width.%]="meter.pct"></div>
+              </div>
+            </div>
+          }
+        </div>
+        <p class="billing-card__note">Limits reset daily at midnight UTC.</p>
+      </section>
+
+      <div class="billing-actions">
+        <a class="billing-actions__btn billing-actions__btn--primary" routerLink="/pricing">Change plan</a>
+        <a class="billing-actions__btn" routerLink="/app">Back to workspace</a>
+      </div>
+    }
+  }
+</main>

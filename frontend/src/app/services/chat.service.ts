@@ -5,6 +5,7 @@ import { Observable, from, map, switchMap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
   ChatMessage,
+  ChatLimitNotice,
   ChatStreamHandlers,
   DocumentStatus,
   GuardrailReport,
@@ -118,18 +119,35 @@ export class ChatService {
     if (!res.ok) {
       const errText = await res.text();
       let detail = errText;
+      let code: string | undefined;
+      let limitType: string | undefined;
       try {
         const j = JSON.parse(errText) as { detail?: unknown };
+        code = (j as { code?: string }).code;
+        limitType = (j as { limit_type?: string }).limit_type;
         const d = j.detail;
         if (typeof d === 'string') {
           detail = d;
         } else if (Array.isArray(d)) {
-          detail = d.map((x: { msg?: string }) => x.msg ?? '').filter(Boolean).join(', ');
+          detail = d
+            .map((x: { msg?: string }) => x.msg ?? '')
+            .filter(Boolean)
+            .join(', ');
         }
       } catch {
         /* use errText */
       }
-      throw new Error(detail || `Request failed (${res.status})`);
+      const error = new Error(
+        detail || `Request failed (${res.status})`
+      ) as Error & {
+        status?: number;
+        code?: string;
+        limitType?: string;
+      };
+      error.status = res.status;
+      error.code = code;
+      error.limitType = limitType;
+      throw error;
     }
 
     const reader = res.body?.getReader();
@@ -200,6 +218,22 @@ export class ChatService {
           guardrail: (obj['guardrail'] as GuardrailReport) ?? null,
           judge: (obj['judge'] as JudgeReport) ?? null,
           retrieved: (obj['retrieved'] as RetrievedSource[]) ?? []
+        });
+        break;
+      case 'limit_reached':
+        handlers.onLimitReached?.({
+          limit_type: (obj['limit_type'] as string) ?? undefined,
+          used: (obj['used'] as number) ?? undefined,
+          limit: (obj['limit'] as number) ?? undefined,
+        } as ChatLimitNotice);
+        break;
+      case 'usage':
+        handlers.onUsage?.({
+          usage_date: (obj['usage_date'] as string) ?? '',
+          ai_words: (obj['ai_words'] as number) ?? 0,
+          uploads: (obj['uploads'] as number) ?? 0,
+          upload_bytes: (obj['upload_bytes'] as number) ?? 0,
+          limit: (obj['limit'] as number) ?? 0,
         });
         break;
       case 'error':

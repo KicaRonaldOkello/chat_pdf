@@ -1,0 +1,129 @@
+<div class="pricing-page">
+  <header class="pricing-header">
+    <div class="pricing-header__inner">
+      <a class="pricing-logo" routerLink="/">
+        <img src="assets/color_logo_on_white.svg" alt="Understanding Notes" class="pricing-logo__img" />
+      </a>
+      <nav class="pricing-nav" aria-label="Primary">
+        <a class="pricing-nav__link" routerLink="/">Home</a>
+        <a
+          class="pricing-nav__link"
+          routerLink="/pricing"
+          routerLinkActive="pricing-nav__link--active"
+          [routerLinkActiveOptions]="{ exact: true }"
+          >Pricing</a
+        >
+        <a class="pricing-nav__link" routerLink="/sign-in">Sign in</a>
+      </nav>
+      <a
+        class="pricing-btn pricing-btn--primary pricing-btn--sm"
+        routerLink="/sign-up"
+        [queryParams]="{ returnUrl: '/app' }"
+        >Begin Research</a
+      >
+    </div>
+  </header>
+
+  <main class="pricing-main">
+    <section class="pricing-hero">
+      <p class="pricing-hero__eyebrow">Pricing</p>
+      <h1 class="pricing-hero__title">Start free. Upgrade when you're ready.</h1>
+      <p class="pricing-hero__lead">
+        Deep understanding, powered by AI — for individuals, researchers, and teams. No credit card required.
+      </p>
+    </section>
+
+    <div class="pricing-billing" role="group" aria-label="Billing period">
+      <div class="pricing-billing__toggle">
+        <span
+          class="pricing-billing__slider"
+          [class.pricing-billing__slider--right]="billing() === 'yearly'"
+          aria-hidden="true"
+        ></span>
+        <button
+          type="button"
+          class="pricing-billing__option"
+          [class.pricing-billing__option--active]="billing() === 'monthly'"
+          (click)="billing.set('monthly')"
+          [attr.aria-pressed]="billing() === 'monthly'"
+        >
+          Monthly
+        </button>
+        <button
+          type="button"
+          class="pricing-billing__option"
+          [class.pricing-billing__option--active]="billing() === 'yearly'"
+          (click)="billing.set('yearly')"
+          [attr.aria-pressed]="billing() === 'yearly'"
+        >
+          Yearly
+        </button>
+      </div>
+      <span class="pricing-billing__save">Save 20%</span>
+    </div>
+
+    <section class="pricing-tiers" aria-label="Plans">
+      @for (tier of tiers; track tier.name) {
+        <article class="pricing-tier" [class.pricing-tier--popular]="tier.popular">
+          @if (tier.popular) {
+            <span class="pricing-tier__badge">Popular</span>
+          }
+          <h2 class="pricing-tier__name">{{ tier.name }}</h2>
+          <div class="pricing-tier__price">
+            <span class="pricing-tier__amount">{{ price(tier) }}</span>
+            <span class="pricing-tier__period">/ month</span>
+          </div>
+          <p class="pricing-tier__billing">
+            {{ billing() === 'yearly' ? 'billed annually · Save 20%' : 'billed monthly' }}
+          </p>
+          <p class="pricing-tier__tagline">{{ tier.tagline }}</p>
+          <ul class="pricing-tier__features">
+            @for (feature of tier.features; track feature) {
+              <li class="pricing-tier__feature">
+                <span class="material-symbols-outlined pricing-tier__check" aria-hidden="true">check</span>
+                {{ feature }}
+              </li>
+            }
+          </ul>
+          @if (isFree(tier)) {
+            <a
+              class="pricing-btn pricing-btn--primary pricing-tier__cta"
+              routerLink="/sign-up"
+              [queryParams]="{ returnUrl: '/app' }"
+              >{{ tier.cta }}</a
+            >
+          } @else {
+            <button
+              type="button"
+              class="pricing-btn pricing-btn--primary pricing-tier__cta"
+              [disabled]="checkingOut() !== null"
+              (click)="choose(tier)"
+            >
+              {{ checkingOut() === tier.name ? 'Redirecting…' : tier.cta }}
+            </button>
+          }
+        </article>
+      }
+    </section>
+
+    @if (checkoutError()) {
+      <p class="pricing-note pricing-note--error" role="alert">{{ checkoutError() }}</p>
+    }
+
+    <p class="pricing-note">Prices in USD. No subscription required for initial inquiry.</p>
+  </main>
+
+  <footer class="pricing-footer">
+    <div class="pricing-footer__inner">
+      <img src="assets/black_transparent.svg" alt="Understanding Notes" class="pricing-footer__logo" />
+      <div class="pricing-footer__links">
+        <a class="pricing-footer__link" routerLink="/">Home</a>
+        <a class="pricing-footer__link" routerLink="/pricing">Pricing</a>
+        <a class="pricing-footer__link" routerLink="/privacy">Privacy Policy</a>
+        <a class="pricing-footer__link" routerLink="/terms">Terms of Service</a>
+        <a class="pricing-footer__link" routerLink="/sign-in">Sign in</a>
+      </div>
+      <p class="pricing-footer__copy">© 2026 Understanding Notes. All rights reserved.</p>
+    </div>
+  </footer>
+</div>

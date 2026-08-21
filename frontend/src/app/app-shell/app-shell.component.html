@@ -52,27 +52,45 @@
           <span class="lumen-sidebar__item-label">Library</span>
         }
       </a>
+      <a
+        class="lumen-sidebar__item lumen-sidebar__item--link"
+        routerLink="/app/billing"
+        routerLinkActive="lumen-sidebar__item--active"
+        [matTooltip]="sidebarCollapsed ? 'Billing' : ''"
+        matTooltipPosition="right"
+      >
+        <span class="material-symbols-outlined" aria-hidden="true">credit_card</span>
+        @if (!sidebarCollapsed) {
+          <span class="lumen-sidebar__item-label">Billing</span>
+        }
+      </a>
     </nav>
 
     <div class="lumen-sidebar__tokens">
       @if (!sidebarCollapsed) {
         <div class="lumen-tokens">
           <div class="lumen-tokens__row">
-            <span class="lumen-tokens__label">Tokens Remaining</span>
-            <span class="lumen-tokens__value">{{ tokensRemainingPercent }}%</span>
+            <span class="lumen-tokens__label">Words remaining</span>
+            <span class="lumen-tokens__value">{{ wordsRemainingLabel() }}</span>
           </div>
           <div class="lumen-tokens__track" aria-hidden="true">
-            <div class="lumen-tokens__fill" [style.width.%]="tokensRemainingPercent"></div>
+            <div
+              class="lumen-tokens__fill"
+              [style.width.%]="wordsRemainingPercent() ?? 100"
+            ></div>
           </div>
         </div>
       } @else {
         <div
           class="lumen-tokens lumen-tokens--collapsed"
-          [matTooltip]="'Tokens: ' + tokensRemainingPercent + '%'"
+          [matTooltip]="'Words: ' + wordsRemainingLabel()"
           matTooltipPosition="right"
         >
           <div class="lumen-tokens__track" aria-hidden="true">
-            <div class="lumen-tokens__fill" [style.width.%]="tokensRemainingPercent"></div>
+            <div
+              class="lumen-tokens__fill"
+              [style.width.%]="wordsRemainingPercent() ?? 100"
+            ></div>
           </div>
         </div>
       }

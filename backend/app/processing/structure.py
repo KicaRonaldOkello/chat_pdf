@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable
+import tempfile
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 log = logging.getLogger(__name__)
+
+#: Retry OCR when at least this fraction of pages is missing (proportional gate).
+MIN_HIRES_RETRY_FRACTION = 0.10
+#: Above this missing fraction, retry the whole document (page-targeted OCR
+#: would reload models once per batch and be wasteful for mostly-empty docs).
+FULL_DOC_HIRES_FRACTION = 0.50
 
 
 @dataclass
@@ -249,6 +256,7 @@ def partition(
     pdf_file: Path,
     *,
     preflight: Any | None = None,
+    on_stage: Callable[[str, float, dict[str, Any]], None] | None = None,
 ) -> tuple[Section, list[ElementRef], int, list[str]]:
     """Partition a PDF with Unstructured, routed by preflight classification.
 
@@ -260,7 +268,7 @@ def partition(
     """
     from unstructured.partition.pdf import partition_pdf
 
-    from app.processing.preflight import quality_gate
+    from app.processing.preflight import missing_pages, quality_gate
 
     warnings: list[str] = []
     forced = _forced_strategy()
@@ -279,7 +287,27 @@ def partition(
             extract_images_in_pdf=False,
         )
 
+    def _report_ocr(page_count: int | None) -> None:
+        """Notify the caller that OCR is about to run (thread-safe callback)."""
+        if on_stage is None:
+            return
+        if page_count:
+            on_stage(
+                "PDF contains images — running OCR on "
+                f"{page_count} page(s), this can take a few minutes",
+                0.25,
+                {"ocr_pages": page_count},
+            )
+        else:
+            on_stage(
+                "PDF contains images — running OCR, this can take a few minutes",
+                0.25,
+                {},
+            )
+
     try:
+        if primary == "hi_res":
+            _report_ocr(expected_pages or None)
         elements = _partition_with(primary)
     except Exception as e:
         if primary == "fast":
@@ -301,30 +329,76 @@ def partition(
         gate_warnings = quality_gate(elements, expected_pages, classified_route="fast")
         if gate_warnings:
             warnings.extend(gate_warnings)
+            missing = missing_pages(elements, expected_pages)
+            missing_fraction = (
+                len(missing) / expected_pages if expected_pages > 0 else 0.0
+            )
             try:
-                log.info(
-                    "fast extraction quality gate failed for %s (%s); "
-                    "retrying with hi_res",
-                    pdf_file,
-                    "; ".join(gate_warnings),
-                )
-                hi_res_elements = _partition_with("hi_res")
-                hi_res_gate = quality_gate(
-                    hi_res_elements, expected_pages, classified_route="hi_res"
-                )
-                if len(hi_res_gate) < len(gate_warnings):
-                    elements = hi_res_elements
-                    warnings = [w for w in hi_res_gate if "no usable text" not in w]
-                    warnings.insert(
-                        0,
-                        "The initial text-only pass looked low-quality; "
-                        "a layout-aware pass was used instead.",
+                if (
+                    expected_pages > 0
+                    and missing
+                    and missing_fraction >= FULL_DOC_HIRES_FRACTION
+                ):
+                    _report_ocr(len(missing))
+                    log.info(
+                        "fast extraction quality gate failed for %s (%s); "
+                        "retrying whole document with hi_res",
+                        pdf_file,
+                        "; ".join(gate_warnings),
                     )
-                elif hi_res_gate and not any("no usable" in w for w in hi_res_gate):
-                    warnings.extend(
-                        "Layout-aware retry also produced incomplete output: " + w
-                        for w in hi_res_gate
+                    hi_res_elements = _partition_with("hi_res")
+                    hi_res_gate = quality_gate(
+                        hi_res_elements, expected_pages, classified_route="hi_res"
                     )
+                    if len(hi_res_gate) < len(gate_warnings):
+                        elements = hi_res_elements
+                        warnings = [w for w in hi_res_gate if "no usable text" not in w]
+                        warnings.insert(
+                            0,
+                            "The initial text-only pass looked low-quality; "
+                            "a layout-aware pass was used instead.",
+                        )
+                    elif hi_res_gate and not any("no usable" in w for w in hi_res_gate):
+                        warnings.extend(
+                            "Layout-aware retry also produced incomplete output: " + w
+                            for w in hi_res_gate
+                        )
+                elif (
+                    expected_pages > 0
+                    and missing
+                    and missing_fraction >= MIN_HIRES_RETRY_FRACTION
+                ):
+                    _report_ocr(len(missing))
+                    log.info(
+                        "fast extraction quality gate failed for %s (%s); "
+                        "retrying OCR on %d of %d pages",
+                        pdf_file,
+                        "; ".join(gate_warnings),
+                        len(missing),
+                        expected_pages,
+                    )
+                    targeted = _partition_pages_hi_res(pdf_file, missing)
+                    merged = _merge_page_elements(elements, targeted, missing)
+                    merged_gate = quality_gate(
+                        merged, expected_pages, classified_route="hi_res"
+                    )
+                    if len(merged_gate) < len(gate_warnings):
+                        elements = merged
+                        warnings = [w for w in merged_gate if "no usable text" not in w]
+                        warnings.insert(
+                            0,
+                            "Some pages lacked extractable text; a layout-aware "
+                            "pass was used on those pages.",
+                        )
+                    elif merged_gate and not any("no usable" in w for w in merged_gate):
+                        warnings.extend(
+                            "Layout-aware retry also produced incomplete output: " + w
+                            for w in merged_gate
+                        )
+                    else:
+                        warnings.append(
+                            f"OCR on {len(missing)} page(s) did not recover usable text."
+                        )
             except Exception as e:
                 log.warning(
                     "hi_res partition failed (%s: %s); continuing with fast output only: %s",
@@ -348,3 +422,53 @@ def _forced_strategy() -> str | None:
 
     value = os.getenv("UNSTRUCTURED_STRATEGY", "").strip().lower()
     return value or None
+
+
+def _page_number(element: Any) -> int:
+    meta = getattr(element, "metadata", None)
+    return int(getattr(meta, "page_number", None) or 1)
+
+
+def _partition_pages_hi_res(pdf_file: Path, page_numbers: list[int]) -> list[Any]:
+    """Run hi_res OCR only on the given 1-indexed pages.
+
+    The requested pages are extracted into a temporary PDF and partitioned
+    once (so layout/OCR models load a single time), then element page numbers
+    are remapped back to the original document.
+    """
+    from unstructured.partition.pdf import partition_pdf
+
+    import fitz
+
+    with tempfile.TemporaryDirectory() as td:
+        subset_path = Path(td) / "ocr-subset.pdf"
+        with fitz.open(str(pdf_file)) as src:
+            subset = fitz.open()
+            try:
+                for page in page_numbers:
+                    subset.insert_pdf(src, from_page=page - 1, to_page=page - 1)
+                subset.save(str(subset_path))
+            finally:
+                subset.close()
+        elements = partition_pdf(
+            filename=str(subset_path),
+            strategy="hi_res",
+            infer_table_structure=True,
+            extract_images_in_pdf=False,
+        )
+        for el in elements:
+            meta = getattr(el, "metadata", None)
+            if meta is not None and hasattr(meta, "page_number"):
+                subset_page = int(getattr(meta, "page_number", 1) or 1)
+                if 1 <= subset_page <= len(page_numbers):
+                    meta.page_number = page_numbers[subset_page - 1]
+        return elements
+
+
+def _merge_page_elements(
+    elements: list[Any], targeted: list[Any], missing_pages: list[int]
+) -> list[Any]:
+    """Replace fast-pass elements on the missing pages with OCR'd ones."""
+    missing = set(missing_pages)
+    kept = [el for el in elements if _page_number(el) not in missing]
+    return kept + list(targeted)

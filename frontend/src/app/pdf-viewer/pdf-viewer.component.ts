@@ -83,6 +83,7 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
   // State management
   private viewReady = false;
   private repaintRafId: number | null = null;
+  private lazyRenderRafId: number | null = null;
   private lastRepaintTime = 0;
   private jumpSub: Subscription | undefined;
 
@@ -114,6 +115,20 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['documentId'] && this.viewReady) {
+      const prevId = changes['documentId'].previousValue;
+      if (
+        typeof prevId === 'string' &&
+        prevId &&
+        prevId !== this.documentId
+      ) {
+        // Persist the outgoing document's reader position under its own id
+        // before loadPdf swaps in the new document.
+        const host = this.pagesHost?.nativeElement;
+        this.documentSession.setDocumentViewState(prevId, {
+          page: this.currentPage,
+          scrollTop: host?.scrollTop ?? 0
+        });
+      }
       this.searchManager.setDocumentId(this.documentId);
     }
     if (changes['pdfData'] && this.viewReady) {
@@ -126,6 +141,10 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
     if (this.repaintRafId !== null) {
       cancelAnimationFrame(this.repaintRafId);
       this.repaintRafId = null;
+    }
+    if (this.lazyRenderRafId !== null) {
+      cancelAnimationFrame(this.lazyRenderRafId);
+      this.lazyRenderRafId = null;
     }
     this.cleanupServices();
     void this.documentLoader.destroyDocument();
@@ -204,7 +223,7 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
 
   async setZoom(pct: number): Promise<void> {
     this.zoomPercent = pct;
-    await this.repaintPages();
+    await this.applyLayoutChange();
   }
 
   goToSource(target: PdfJumpTarget): void {
@@ -214,6 +233,7 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
     this.highlightManager.setActiveHighlight(target);
     this.scrollManager.scrollToPage(target.page);
     this.currentPage = this.scrollManager.getCurrentPage();
+    this.scheduleLazyRender();
     requestAnimationFrame(() => this.highlightManager.applyHighlight(target, true));
   }
 
@@ -232,8 +252,15 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
     }
 
     this.highlightManager.setHostElement(pagesHost);
-    this.resizeManager.setupResizeObserver(pagesHost, () => this.scheduleRepaint());
-    this.scrollManager.setupScrollListener(pagesHost, (page) => this.handlePageChange(page));
+    this.resizeManager.setupResizeObserver(pagesHost, () => this.scheduleResizeRepaint());
+    this.scrollManager.setupScrollListener(
+      pagesHost,
+      (page) => this.handlePageChange(page),
+      () => {
+        this.saveViewState();
+        this.scheduleLazyRender();
+      }
+    );
 
     if (thumbHost) {
       this.thumbnailManager.setHostElement(thumbHost);
@@ -250,11 +277,20 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
 
   private handlePageChange(page: number): void {
     this.currentPage = page;
-    if (this.documentId) {
-      this.documentSession.setDocumentViewPage(this.documentId, page);
-    }
+    this.saveViewState();
     this.thumbnailManager.setCurrentPage(page);
     this.cdr.markForCheck();
+  }
+
+  private saveViewState(): void {
+    if (!this.documentId) {
+      return;
+    }
+    const host = this.pagesHost?.nativeElement;
+    this.documentSession.setDocumentViewState(this.documentId, {
+      page: this.currentPage,
+      scrollTop: host?.scrollTop ?? 0
+    });
   }
 
   private syncSearchState(): void {
@@ -330,23 +366,28 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
     this.scrollManager.setScrollLock(true);
 
     try {
-      const scrollState = this.scrollManager.saveScrollPosition();
-      
-      const rendered = await this.renderService.renderAllPages(pdf, {
+      const savedState = this.documentSession.getDocumentViewState(this.documentId);
+
+      const rendered = await this.renderService.renderDocument(pdf, {
         host,
         zoomPercent: this.zoomPercent,
         generation: gen
       });
 
-    if (!rendered) {
-      this.scheduleRepaint();
-      return;
-    }
+      if (!rendered) {
+        this.scheduleRepaint();
+        return;
+      }
 
       // Re-attach intersection observer to new page elements
       this.scrollManager.attachPageObservers(host);
 
-      await this.scrollManager.restoreScrollPosition(scrollState, this.totalPages);
+      // Restore the exact per-document scroll position now that the
+      // placeholders exist (correct page geometry).
+      if (savedState.scrollTop !== undefined && savedState.scrollTop > 0) {
+        host.scrollTop = savedState.scrollTop;
+      }
+      await this.renderVisiblePages();
 
       const activeHighlight = this.highlightManager.getActiveHighlight();
       if (activeHighlight) {
@@ -393,6 +434,68 @@ export class PdfViewerComponent implements OnInit, AfterViewInit, OnChanges, OnD
     this.repaintRafId = requestAnimationFrame(() => {
       this.repaintRafId = null;
       void this.repaintPages();
+    });
+  }
+
+  private scheduleResizeRepaint(): void {
+    if (this.repaintRafId !== null) {
+      cancelAnimationFrame(this.repaintRafId);
+    }
+    this.repaintRafId = requestAnimationFrame(() => {
+      this.repaintRafId = null;
+      void this.applyLayoutChange();
+    });
+  }
+
+  /** Resize/zoom: update geometry in place, re-render only visible pages. */
+  private async applyLayoutChange(): Promise<void> {
+    const host = this.pagesHost?.nativeElement;
+    const pdf = this.documentLoader.getPdf();
+    if (!host || !pdf || !this.pdfReady) {
+      return;
+    }
+    const gen = this.documentLoader.getLoadGeneration();
+    const ok = await this.renderService.updateLayout({
+      host,
+      zoomPercent: this.zoomPercent,
+      generation: gen
+    });
+    if (!ok) {
+      this.scheduleResizeRepaint();
+      return;
+    }
+    await this.renderVisiblePages(true);
+  }
+
+  private async renderVisiblePages(force = false): Promise<void> {
+    const host = this.pagesHost?.nativeElement;
+    const pdf = this.documentLoader.getPdf();
+    if (!host || !pdf || !this.pdfReady) {
+      return;
+    }
+    const gen = this.documentLoader.getLoadGeneration();
+    const buffer = Math.max(host.clientHeight, 800);
+    const pages = this.renderService.getVisiblePageNumbers(host, buffer);
+    await this.renderService.renderPagesInRange(
+      pdf,
+      pages,
+      {
+        host,
+        zoomPercent: this.zoomPercent,
+        generation: gen
+      },
+      force
+    );
+    this.renderService.evictDistantCanvases(host, pages);
+  }
+
+  private scheduleLazyRender(): void {
+    if (this.lazyRenderRafId !== null) {
+      return;
+    }
+    this.lazyRenderRafId = requestAnimationFrame(() => {
+      this.lazyRenderRafId = null;
+      void this.renderVisiblePages();
     });
   }
 

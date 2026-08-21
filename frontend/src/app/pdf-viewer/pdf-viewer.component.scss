@@ -536,6 +536,18 @@
   background: #fff;
 }
 
+:host ::ng-deep .pdf-page-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(0, 0, 0, 0.22);
+  font-size: 0.85rem;
+  user-select: none;
+  pointer-events: none;
+}
+
 /*
   Source-jump highlight: rendered inside `.pdf-page-inner` above the canvas.
   Lives behind the text layer visually (text layer is z:1) but above the

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import fitz
@@ -10,11 +11,61 @@ from fastapi.testclient import TestClient
 
 from app.api.routes.upload import router as upload_router
 from app.auth.google_auth import require_session_token
+from app.db.dependencies import (
+    get_plan_repository,
+    get_subscription_repository,
+    get_usage_meter_repository,
+)
+from app.db.repositories import PlanRow
+
+
+def _free_plan() -> PlanRow:
+    return PlanRow(
+        id=1,
+        slug="free",
+        name="Free",
+        billing_period=None,
+        dodo_product_id=None,
+        price_cents=0,
+        words_per_day=2_000,
+        uploads_per_day=5,
+        upload_bytes_per_day=5 * 1024 * 1024,
+        max_upload_bytes_per_import=5 * 1024 * 1024,
+        files_in_scope=2,
+        is_active=True,
+        created_at=datetime.now(UTC),
+    )
+
+
+class _FakePlanRepo:
+    async def get_by_slug(self, slug: str) -> PlanRow | None:
+        return _free_plan()
+
+    async def get_free_plan(self) -> PlanRow | None:
+        return _free_plan()
+
+
+class _FakeSubscriptionRepo:
+    async def get_for_user(self, user_id: str) -> None:
+        return None
+
+
+class _FakeUsageRepo:
+    async def get_for_user_date(self, user_id: str, usage_date) -> None:
+        return None
+
+    async def increment(self, *args, **kwargs) -> None:
+        return None
 
 
 def _make_app() -> FastAPI:
     app = FastAPI()
     app.include_router(upload_router)
+    app.dependency_overrides[get_plan_repository] = lambda: _FakePlanRepo()
+    app.dependency_overrides[get_subscription_repository] = (
+        lambda: _FakeSubscriptionRepo()
+    )
+    app.dependency_overrides[get_usage_meter_repository] = lambda: _FakeUsageRepo()
     return app
 
 

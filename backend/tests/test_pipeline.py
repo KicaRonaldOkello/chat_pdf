@@ -9,8 +9,9 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 import pytest
 
 from app.db.repositories.document_state import DocumentStatus
-from app.processing.pipeline import process_document
+from app.processing.pipeline import enrich_in_background, process_document
 from app.processing.preflight import DocumentPreflight, PreflightError
+from app.settings import settings
 from app.processing.structure import ElementRef, Section
 from app.processing.tables import TableDiagnostics
 
@@ -122,7 +123,7 @@ async def test_process_document_pull_failure_sets_error_status() -> None:
 
 
 @pytest.mark.asyncio
-async def test_process_document_happy_path_ready_and_awaits_enrichment() -> None:
+async def test_process_document_happy_path_ready_and_spawns_enrichment() -> None:
     root = _minimal_root()
     repo = MagicMock()
     repo.get_status = AsyncMock(
@@ -176,9 +177,9 @@ async def test_process_document_happy_path_ready_and_awaits_enrichment() -> None
             return_value=preflight,
         ) as classify,
         patch(
-            "app.processing.pipeline.enrich_in_background",
-            new_callable=AsyncMock,
-        ) as enrich,
+            "app.processing.pipeline._spawn_enrichment",
+            new_callable=MagicMock,
+        ) as spawn_enrich,
     ):
         outcome = await process_document("doc-42")
 
@@ -192,7 +193,31 @@ async def test_process_document_happy_path_ready_and_awaits_enrichment() -> None
     assert final.args[0] == "doc-42"
     assert final.kwargs.get("status") == "ready"
     assert final.kwargs.get("progress") == 1.0
-    enrich.assert_awaited_once()
+    spawn_enrich.assert_called_once_with("doc-42", root, "paper.pdf", 3)
+
+
+@pytest.mark.asyncio
+async def test_enrich_in_background_times_out_gracefully(monkeypatch) -> None:
+    async def _never(*_args, **_kwargs):
+        await asyncio.sleep(60)
+        return [], {}
+
+    monkeypatch.setattr(
+        settings, "metadata_openrouter_enrichment_deadline_seconds", 0.05
+    )
+    with (
+        patch(
+            "app.processing.pipeline.metadata.build_enrichment",
+            side_effect=_never,
+        ),
+        patch(
+            "app.processing.pipeline.document_data.save_sections_index",
+            new_callable=AsyncMock,
+        ) as save_index,
+    ):
+        await enrich_in_background("doc-timeout", _minimal_root(), "f.pdf", 3)
+
+    save_index.assert_not_awaited()  # timed out before saving anything
 
 
 @pytest.mark.asyncio
@@ -250,8 +275,8 @@ async def test_process_document_records_table_diagnostics_and_warnings() -> None
         patch("app.processing.pipeline.chunking.build_chunks", return_value=[]),
         patch("app.processing.pipeline.get_storage", return_value=storage),
         patch(
-            "app.processing.pipeline.enrich_in_background",
-            new_callable=AsyncMock,
+            "app.processing.pipeline._spawn_enrichment",
+            new_callable=MagicMock,
         ),
     ):
         await process_document("doc-tables")
@@ -358,8 +383,8 @@ async def test_process_document_partial_when_warnings_present() -> None:
         patch("app.processing.pipeline.images.enrich_images", new_callable=AsyncMock),
         patch("app.processing.pipeline.chunking.build_chunks", return_value=[]),
         patch(
-            "app.processing.pipeline.enrich_in_background",
-            new_callable=AsyncMock,
+            "app.processing.pipeline._spawn_enrichment",
+            new_callable=MagicMock,
         ),
     ):
         await process_document("doc-partial")

@@ -11,6 +11,7 @@
         <a class="landing-nav__link" href="#services">Features</a>
         <a class="landing-nav__link" href="#compare">Compare</a>
         <a class="landing-nav__link" href="#security">Security</a>
+        <a class="landing-nav__link" routerLink="/pricing">Pricing</a>
       </nav>
       <div class="landing-header__actions">
         <a class="landing-nav__link landing-nav__link--signin" routerLink="/sign-in">Sign in</a>
@@ -42,6 +43,7 @@
         <a class="landing-mobile-menu__link" href="#services" (click)="menuOpen.set(false)">Features</a>
         <a class="landing-mobile-menu__link" href="#compare" (click)="menuOpen.set(false)">Compare</a>
         <a class="landing-mobile-menu__link" href="#security" (click)="menuOpen.set(false)">Security</a>
+        <a class="landing-mobile-menu__link" routerLink="/pricing" (click)="menuOpen.set(false)">Pricing</a>
         <a class="landing-mobile-menu__link" routerLink="/sign-in" (click)="menuOpen.set(false)">Sign in</a>
         <a
           class="landing-btn landing-btn--primary landing-btn--sm landing-mobile-menu__cta"
@@ -707,12 +709,18 @@
           <a class="landing-footer__link landing-footer__link--underline" href="#services">Features</a>
           <a class="landing-footer__link landing-footer__link--underline" href="#compare">Compare</a>
           <a class="landing-footer__link landing-footer__link--underline" href="#security">Security</a>
+          <a class="landing-footer__link landing-footer__link--underline" routerLink="/pricing">Pricing</a>
         </div>
         <div class="landing-footer__col">
           <h3 class="landing-footer__heading-serif">Explore</h3>
           <a class="landing-footer__link landing-footer__link--underline" href="#feature-chat">Chat with documents</a>
           <a class="landing-footer__link landing-footer__link--underline" href="#feature-summaries">Smart summarization</a>
           <a class="landing-footer__link landing-footer__link--underline" href="#feature-voice">AI Text to Speech</a>
+        </div>
+        <div class="landing-footer__col">
+          <h3 class="landing-footer__heading-serif">Legal</h3>
+          <a class="landing-footer__link landing-footer__link--underline" routerLink="/privacy">Privacy Policy</a>
+          <a class="landing-footer__link landing-footer__link--underline" routerLink="/terms">Terms of Service</a>
         </div>
       </div>
     </div>

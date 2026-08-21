@@ -28,6 +28,18 @@ log = logging.getLogger(__name__)
 
 RETRYABLE_STATUSES = frozenset({"parser_failure", "resource_limit"})
 
+# Fire-and-forget enrichment tasks, tracked so they are not garbage-collected.
+_enrichment_tasks: set[asyncio.Task[None]] = set()
+
+
+def _spawn_enrichment(
+    doc_id: str, root: Section, filename: str, num_pages: int
+) -> None:
+    """Run metadata enrichment off the processing path; failures are non-fatal."""
+    task = asyncio.create_task(enrich_in_background(doc_id, root, filename, num_pages))
+    _enrichment_tasks.add(task)
+    task.add_done_callback(_enrichment_tasks.discard)
+
 
 @dataclass
 class RunOutcome:
@@ -101,17 +113,56 @@ async def process_document(doc_id: str, run_attempt: int = 1) -> RunOutcome:
                 get_storage().put_debug_json(
                     doc_id, "preflight", preflight_result.to_dict()
                 )
+                await repo.update_status(
+                    doc_id,
+                    stage=f"parsing document structure via {preflight_result.route}",
+                    progress=0.25,
+                )
+                await session.commit()
+
+                loop = asyncio.get_running_loop()
+
+                def _report_ocr(
+                    stage: str, progress: float, _extra: dict[str, Any]
+                ) -> None:
+                    """Bridge OCR progress from the partition worker thread to the
+                    async status row without blocking the thread."""
+
+                    async def _write() -> None:
+                        try:
+                            # Short-lived session per write: the pipeline's own
+                            # session must never be shared with tasks scheduled
+                            # from another thread.
+                            async with document_data.document_db_session() as (
+                                write_session,
+                                write_repo,
+                            ):
+                                await write_repo.update_status(
+                                    doc_id,
+                                    status="extracting",
+                                    stage=stage,
+                                    progress=progress,
+                                )
+                                await write_session.commit()
+                        except Exception:
+                            log.exception(
+                                "failed to report OCR progress for %s", doc_id
+                            )
+
+                    asyncio.run_coroutine_threadsafe(_write(), loop)
+
                 async with concurrency.parse_semaphore():
                     root, elements, num_pages, part_warnings = await asyncio.to_thread(
-                        structure.partition, pdf, preflight=preflight_result
+                        structure.partition,
+                        pdf,
+                        preflight=preflight_result,
+                        on_stage=_report_ocr,
                     )
                 _enrich_root = root
                 _enrich_num_pages = num_pages
                 await repo.update_status(
                     doc_id,
                     num_pages=num_pages,
-                    stage=f"parsing document structure via {preflight_result.route}",
-                    progress=0.25,
                     warnings=part_warnings or None,
                 )
                 await session.commit()
@@ -250,14 +301,11 @@ async def process_document(doc_id: str, run_attempt: int = 1) -> RunOutcome:
 
     # Enrichment runs *after* the document is ready so that chunk retrieval
     # works immediately.  Failures here are non-fatal — the document is
-    # already queryable; only metadata quality is degraded.
+    # already queryable; only metadata quality is degraded.  It is spawned
+    # rather than awaited so a slow/failing LLM provider can never block the
+    # worker from claiming new documents.
     if _enrich_root is not None and final_status in ("ready", "partial"):
-        try:
-            await enrich_in_background(
-                doc_id, _enrich_root, _enrich_filename, _enrich_num_pages
-            )
-        except Exception:
-            log.exception("enrichment failed for %s (document is still ready)", doc_id)
+        _spawn_enrichment(doc_id, _enrich_root, _enrich_filename, _enrich_num_pages)
     return outcome
 
 
@@ -266,11 +314,14 @@ async def enrich_in_background(
 ) -> None:
     try:
         log.info("background enrichment start for %s", doc_id)
-        sections_index, doc_meta = await metadata.build_enrichment(
-            root,
-            document_id=doc_id,
-            filename=filename,
-            num_pages=num_pages,
+        sections_index, doc_meta = await asyncio.wait_for(
+            metadata.build_enrichment(
+                root,
+                document_id=doc_id,
+                filename=filename,
+                num_pages=num_pages,
+            ),
+            timeout=settings.metadata_openrouter_enrichment_deadline_seconds,
         )
         await document_data.save_sections_index(doc_id, sections_index)
         await document_data.save_document_meta(doc_id, doc_meta)
@@ -280,6 +331,13 @@ async def enrich_in_background(
             "background enrichment done for %s (%d sections)",
             doc_id,
             len(sections_index),
+        )
+    except TimeoutError:
+        log.warning(
+            "background enrichment timed out for %s after %.0fs "
+            "(document is still ready)",
+            doc_id,
+            settings.metadata_openrouter_enrichment_deadline_seconds,
         )
     except Exception:
         log.exception("background enrichment failed for %s", doc_id)

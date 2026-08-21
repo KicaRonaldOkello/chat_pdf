@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     metadata_ollama_enrichment_timeout: float = 180.0
     metadata_doc_meta_ollama_timeout: float = 90.0
     metadata_openrouter_enrichment_timeout: float = 180.0
+    #: Hard cap on one document's metadata enrichment, so a flaky provider can
+    #: degrade metadata quality without occupying the worker for an hour.
+    metadata_openrouter_enrichment_deadline_seconds: float = 600.0
     metadata_openrouter_enrichment_temperature: float = 0.1
     metadata_llm_temperature: float = 0.1
     metadata_ollama_batch_section_summary_max: int = 400
@@ -114,6 +117,8 @@ class Settings(BaseSettings):
 
     # CORS — comma-separated in env, e.g. CORS_ALLOW_ORIGINS="https://understandingnotes.com,https://www.understandingnotes.com"
     cors_allow_origins: str = ""
+    # Public origin of the Angular app — used for Dodo checkout return/cancel URLs.
+    frontend_base_url: str = "http://localhost:4200"
 
     # Database
     database_url: str = ""
@@ -138,6 +143,15 @@ class Settings(BaseSettings):
     otel_enabled: bool = False
     otel_service_name: str = "understanding-notes-backend"
     otel_exporter_otlp_endpoint: str = ""  # e.g. "http://localhost:4318"
+
+    # Dodo Payments (billing / subscriptions)
+    dodo_api_key: str = ""  # test or live API key from the Dodo dashboard
+    dodo_webhook_secret: str = ""  # webhook signing secret (test/live)
+    dodo_mode: Literal["test_mode", "live_mode"] = "test_mode"
+    dodo_webhook_url: str = ""  # e.g. "https://api.example.com/webhooks/dodo"
+    dodo_billing_currency: str = "USD"  # locked at first charge — must match checkout
+    dodo_trial_days: int = 0
+    dodo_default_billing_country: str = ""  # ISO 3166-1 alpha-2, e.g. "US"
 
     # Upload limits
     max_pdf_upload_bytes: int = 5 * 1024 * 1024

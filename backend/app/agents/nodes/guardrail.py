@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 
 
 def render_user(state: GraphState) -> str:
-    import datetime
+    from app.dates import utc_today
 
     history = state.get("history") or []
     last = "\n".join(f"{m['role']}: {m['content']}" for m in history[-4:])
@@ -36,7 +36,7 @@ def render_user(state: GraphState) -> str:
             f"User may ask about all of them together, compare them, or ask for "
             f"common themes; that is in scope for this feature."
         )
-    today = datetime.date.today().isoformat()
+    today = utc_today().isoformat()
     return (
         f"Today's date: {today}\n"
         f"{scope}\n\n"

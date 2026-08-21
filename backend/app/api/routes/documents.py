@@ -30,7 +30,7 @@ async def _store_display_for_uploaded(doc_id: str) -> tuple[str, str]:
     if s is None:
         return "unknown", "unknown"
     st = s.status
-    if st == "ready":
+    if st in ("ready", "partial"):
         return st, "analyzed"
     if st in (
         "error",
@@ -39,7 +39,6 @@ async def _store_display_for_uploaded(doc_id: str) -> tuple[str, str]:
         "encrypted",
         "resource_limit",
         "parser_failure",
-        "partial",
     ):
         return st, "error"
     return st, "processing"
