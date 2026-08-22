@@ -543,6 +543,7 @@ def pack_section_chunks(
     filename: str,
     num_pages: int,
     token_budget: int,
+    max_sections_per_chunk: int | None = None,
 ) -> list[list[Section]]:
     one_shot = render_user_prompt(
         all_sections=all_sections,
@@ -552,12 +553,21 @@ def pack_section_chunks(
         chunk_idx=0,
         chunk_total=1,
     )
-    if count_tokens(one_shot) <= token_budget:
+    if count_tokens(one_shot) <= token_budget and (
+        max_sections_per_chunk is None or len(all_sections) <= max_sections_per_chunk
+    ):
         return [all_sections]
 
     chunks: list[list[Section]] = []
     current: list[Section] = []
     for s in all_sections:
+        if (
+            current
+            and max_sections_per_chunk is not None
+            and len(current) >= max_sections_per_chunk
+        ):
+            chunks.append(current)
+            current = []
         trial = [*current, s]
         rendered = render_user_prompt(
             all_sections=all_sections,
@@ -746,6 +756,7 @@ async def openrouter_enrich_one_chunk(
     filename: str,
     num_pages: int,
     chunk_total: int,
+    max_tokens: int | None = None,
 ) -> tuple[int, dict[str, Any] | None]:
     user = render_user_prompt(
         all_sections=all_sections,
@@ -761,6 +772,7 @@ async def openrouter_enrich_one_chunk(
         user=user,
         timeout=settings.metadata_openrouter_enrichment_timeout,
         temperature=settings.metadata_openrouter_enrichment_temperature,
+        max_tokens=max_tokens,
     )
     return idx, parsed if isinstance(parsed, dict) else None
 
@@ -790,6 +802,7 @@ async def enrich_via_openrouter(
         filename=filename,
         num_pages=num_pages,
         token_budget=settings.metadata_openrouter_input_token_budget,
+        max_sections_per_chunk=settings.metadata_openrouter_max_sections_per_chunk,
     )
     log.info(
         "enrichment: %d section(s) -> %d OpenRouter call(s) (budget=%d tokens)",
@@ -804,14 +817,28 @@ async def enrich_via_openrouter(
 
     async def _one_chunk(i: int, c: list[Section]) -> tuple[int, dict[str, Any] | None]:
         async with sem:
-            return await openrouter_enrich_one_chunk(
-                i,
-                c,
-                all_sections=sections,
-                filename=filename,
-                num_pages=num_pages,
-                chunk_total=n,
-            )
+            # One repair-retry per chunk: truncation/JSON failures are usually
+            # transient, and a retry is far cheaper than losing ~40 sections
+            # to heuristics.
+            result = None
+            for _attempt in range(2):
+                result = await openrouter_enrich_one_chunk(
+                    i,
+                    c,
+                    all_sections=sections,
+                    filename=filename,
+                    num_pages=num_pages,
+                    chunk_total=n,
+                    max_tokens=settings.metadata_openrouter_max_output_tokens,
+                )
+                if result[1] is not None:
+                    return result
+                log.warning(
+                    "enrichment chunk %d/%d returned no JSON; retrying",
+                    i + 1,
+                    n,
+                )
+            return result
 
     results = await asyncio.gather(
         *(_one_chunk(i, c) for i, c in enumerate(chunks)),

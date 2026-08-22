@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     #: degrade metadata quality without occupying the worker for an hour.
     metadata_openrouter_enrichment_deadline_seconds: float = 600.0
     metadata_openrouter_enrichment_temperature: float = 0.1
+    #: Cap sections per enrichment call so output stays small enough to parse
+    #: (input budget alone doesn't bound output, which scales with section count).
+    metadata_openrouter_max_sections_per_chunk: int = 40
+    #: Hard output-token cap for OpenRouter enrichment responses.
+    metadata_openrouter_max_output_tokens: int = 8000
     metadata_llm_temperature: float = 0.1
     metadata_ollama_batch_section_summary_max: int = 400
     metadata_ollama_batch_keywords_max: int = 10

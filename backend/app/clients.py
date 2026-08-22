@@ -18,6 +18,7 @@ async def openrouter_json(
     user: str,
     timeout: float | None = None,
     temperature: float = 0.0,
+    max_tokens: int | None = None,
     include_reasoning: bool = False,
     high_reasoning_effort: bool = False,
 ) -> Any | None:
@@ -65,6 +66,7 @@ async def openrouter_json(
             ],
             response_format={"type": "json_object"},
             temperature=temperature,
+            max_tokens=max_tokens,
             extra_body=extra_body,
         )
         content = response.choices[0].message.content
