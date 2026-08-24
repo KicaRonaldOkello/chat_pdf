@@ -1,0 +1,56 @@
+name: Deploy Frontend (staging + prod)
+
+on:
+  push:
+    branches: [main, develop]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          # Production: merge develop -> main
+          - environment: production
+            branch: main
+            ng_config: production
+            target: /var/www/understandingnotes
+            host_secret: PROD_VPS_HOST
+            user_secret: PROD_VPS_SSH_USER
+            key_secret: PROD_VPS_SSH_KEY
+          # Staging: push to develop
+          - environment: staging
+            branch: develop
+            ng_config: staging
+            target: /var/www/understandingnotes-staging
+            host_secret: VPS_HOST
+            user_secret: VPS_SSH_USER
+            key_secret: VPS_SSH_KEY
+    if: github.ref_name == matrix.branch
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build (${{ matrix.environment }})
+        run: npx ng build --configuration ${{ matrix.ng_config }}
+        working-directory: frontend
+
+      - name: Deploy to nginx root (${{ matrix.environment }})
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets[matrix.host_secret] }}
+          username: ${{ secrets[matrix.user_secret] }}
+          key: ${{ secrets[matrix.key_secret] }}
+          source: frontend/dist/frontend/browser/*
+          target: ${{ matrix.target }}
+          strip_components: 4
+          rm: true
