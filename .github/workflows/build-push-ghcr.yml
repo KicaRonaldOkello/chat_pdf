@@ -59,7 +59,7 @@ jobs:
           username: ${{ secrets.VPS_SSH_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           source: backend/docker-compose.prod.yml
-          target: ~/chat-pdf-staging
+          target: ~/chat-pdf-prod
           strip_components: 2
 
       - name: Deploy staging
@@ -70,10 +70,10 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
-            mkdir -p ~/chat-pdf-staging && cd ~/chat-pdf-staging
+            mkdir -p ~/chat-pdf-prod && cd ~/chat-pdf-prod
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ghcr.io/${{ needs.build.outputs.owner_lc }}/chat-pdf-backend:staging
-            docker compose -p chatpdf_staging -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
+            IMAGE_TAG=staging docker compose -p chatpdf_staging -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
             docker exec chat_pdf_api alembic upgrade head
             docker ps --filter name=chat_pdf
 
@@ -105,6 +105,6 @@ jobs:
             mkdir -p ~/chat-pdf-prod && cd ~/chat-pdf-prod
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ghcr.io/${{ needs.build.outputs.owner_lc }}/chat-pdf-backend:latest
-            docker compose -p chatpdf -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
+            IMAGE_TAG=latest docker compose -p chatpdf -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
             docker exec chat_pdf_api alembic upgrade head
             docker ps --filter name=chat_pdf
