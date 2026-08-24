@@ -1,22 +1,35 @@
-name: Deploy Backend — Production
+name: Deploy Backend (staging + prod)
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      owner_lc: ${{ steps.owner.outputs.value }}
+      image_tag: ${{ steps.tag.outputs.value }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Lowercase owner for GHCR
-        run: echo "OWNER_LC=${OWNER,,}" >> $GITHUB_ENV
+        id: owner
+        run: echo "value=${OWNER,,}" >> "$GITHUB_OUTPUT"
         env:
           OWNER: ${{ github.repository_owner }}
+
+      - name: Image tag (main -> latest, develop -> staging)
+        id: tag
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "value=latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=staging" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -30,23 +43,68 @@ jobs:
         with:
           context: ./backend
           push: true
-          tags: ghcr.io/${{ env.OWNER_LC }}/chat-pdf-backend:latest
+          tags: ghcr.io/${{ steps.owner.outputs.value }}/chat-pdf-backend:${{ steps.tag.outputs.value }}
 
-      - name: Deploy to production VPS
-        uses: appleboy/ssh-action@v1
+  deploy-staging:
+    if: github.ref_name == 'develop'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy compose file to staging server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_SSH_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: backend/docker-compose.prod.yml
+          target: ~/chat-pdf-prod
+          strip_components: 2
+
+      - name: Deploy staging
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_SSH_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            cd ~/chat-pdf-prod || {
-              echo "Directory ~/chat-pdf-prod not found."
-              echo "Run this on the VPS first:"
-              echo "  mkdir -p ~/chat-pdf-prod"
-              echo "  # Copy docker-compose.prod.yml and .env into that directory"
-              exit 1
-            }
+            set -e
+            mkdir -p ~/chat-pdf-prod && cd ~/chat-pdf-prod
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker pull ghcr.io/${{ env.OWNER_LC }}/chat-pdf-backend:latest
-            docker compose -p chatpdf -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
+            docker pull ghcr.io/${{ needs.build.outputs.owner_lc }}/chat-pdf-backend:staging
+            IMAGE_TAG=staging docker compose -p chatpdf_staging -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
             docker exec chat_pdf_api alembic upgrade head
+            docker ps --filter name=chat_pdf
+
+  deploy-prod:
+    if: github.ref_name == 'main'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy compose file to production server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.PROD_VPS_HOST }}
+          username: ${{ secrets.PROD_VPS_SSH_USER }}
+          key: ${{ secrets.PROD_VPS_SSH_KEY }}
+          source: backend/docker-compose.prod.yml
+          target: ~/chat-pdf-prod
+          strip_components: 2
+
+      - name: Deploy production
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_VPS_HOST }}
+          username: ${{ secrets.PROD_VPS_SSH_USER }}
+          key: ${{ secrets.PROD_VPS_SSH_KEY }}
+          script: |
+            set -e
+            mkdir -p ~/chat-pdf-prod && cd ~/chat-pdf-prod
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ghcr.io/${{ needs.build.outputs.owner_lc }}/chat-pdf-backend:latest
+            IMAGE_TAG=latest docker compose -p chatpdf -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
+            docker exec chat_pdf_api alembic upgrade head
+            docker ps --filter name=chat_pdf

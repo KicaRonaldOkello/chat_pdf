@@ -16,7 +16,7 @@
 
 services:
   api:
-    image: ghcr.io/${GHCR_OWNER:-you}/chat-pdf-backend:latest
+    image: ghcr.io/${GHCR_OWNER:-you}/chat-pdf-backend:${IMAGE_TAG:-latest}
     container_name: chat_pdf_api
     restart: unless-stopped
     network_mode: host
@@ -30,7 +30,7 @@ services:
       start_period: 15s
 
   worker:
-    image: ghcr.io/${GHCR_OWNER:-you}/chat-pdf-backend:latest
+    image: ghcr.io/${GHCR_OWNER:-you}/chat-pdf-backend:${IMAGE_TAG:-latest}
     container_name: chat_pdf_worker
     restart: unless-stopped
     network_mode: host
