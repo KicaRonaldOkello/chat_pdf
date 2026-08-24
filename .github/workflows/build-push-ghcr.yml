@@ -22,7 +22,7 @@ jobs:
         env:
           OWNER: ${{ github.repository_owner }}
 
-      - name: Image tag (main → latest, develop → staging)
+      - name: Image tag (main -> latest, develop -> staging)
         id: tag
         run: |
           if [ "${{ github.ref_name }}" = "main" ]; then
@@ -59,28 +59,23 @@ jobs:
           username: ${{ secrets.VPS_SSH_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           source: backend/docker-compose.prod.yml
-          target: ~/chat-pdf-prod
+          target: ~/chat-pdf-staging
           strip_components: 2
 
       - name: Deploy staging
         uses: appleboy/ssh-action@v1.0.3
-        envs: GITHUB_TOKEN,OWNER_LC,IMAGE_TAG
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_SSH_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
-            mkdir -p ~/chat-pdf-prod && cd ~/chat-pdf-prod
-            echo "$GITHUB_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker pull ghcr.io/$OWNER_LC/chat-pdf-backend:$IMAGE_TAG
+            mkdir -p ~/chat-pdf-staging && cd ~/chat-pdf-staging
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ghcr.io/${{ needs.build.outputs.owner_lc }}/chat-pdf-backend:staging
             docker compose -p chatpdf_staging -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
             docker exec chat_pdf_api alembic upgrade head
             docker ps --filter name=chat_pdf
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OWNER_LC: ${{ needs.build.outputs.owner_lc }}
-          IMAGE_TAG: staging
 
   deploy-prod:
     if: github.ref_name == 'main'
@@ -101,7 +96,6 @@ jobs:
 
       - name: Deploy production
         uses: appleboy/ssh-action@v1.0.3
-        envs: GITHUB_TOKEN,OWNER_LC,IMAGE_TAG
         with:
           host: ${{ secrets.PROD_VPS_HOST }}
           username: ${{ secrets.PROD_VPS_SSH_USER }}
@@ -109,12 +103,8 @@ jobs:
           script: |
             set -e
             mkdir -p ~/chat-pdf-prod && cd ~/chat-pdf-prod
-            echo "$GITHUB_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker pull ghcr.io/$OWNER_LC/chat-pdf-backend:$IMAGE_TAG
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ghcr.io/${{ needs.build.outputs.owner_lc }}/chat-pdf-backend:latest
             docker compose -p chatpdf -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
             docker exec chat_pdf_api alembic upgrade head
             docker ps --filter name=chat_pdf
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OWNER_LC: ${{ needs.build.outputs.owner_lc }}
-          IMAGE_TAG: latest
