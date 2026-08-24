@@ -71,6 +71,9 @@ jobs:
           script: |
             set -e
             mkdir -p ~/chat-pdf-prod && cd ~/chat-pdf-prod
+            # Remove any api/worker containers from earlier manual runs or
+            # other compose projects so compose can recreate them by name.
+            docker ps -aq --filter "name=chat_pdf_api" --filter "name=chat_pdf_worker" | xargs -r docker rm -f
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ghcr.io/${{ needs.build.outputs.owner_lc }}/chat-pdf-backend:staging
             IMAGE_TAG=staging docker compose -p chatpdf_staging -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
@@ -103,6 +106,9 @@ jobs:
           script: |
             set -e
             mkdir -p ~/chat-pdf-prod && cd ~/chat-pdf-prod
+            # Remove any api/worker containers from earlier manual runs or
+            # other compose projects so compose can recreate them by name.
+            docker ps -aq --filter "name=chat_pdf_api" --filter "name=chat_pdf_worker" | xargs -r docker rm -f
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ghcr.io/${{ needs.build.outputs.owner_lc }}/chat-pdf-backend:latest
             IMAGE_TAG=latest docker compose -p chatpdf -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
