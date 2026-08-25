@@ -25,6 +25,15 @@ jobs:
         run: npx ng build --configuration production
         working-directory: frontend
 
+      - name: Prepare production web root
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.PROD_VPS_HOST }}
+          username: ${{ secrets.PROD_VPS_SSH_USER }}
+          key: ${{ secrets.PROD_VPS_SSH_KEY }}
+          script: |
+            mkdir -p /var/www/understandnotes
+
       - name: Deploy to production nginx root
         uses: appleboy/scp-action@v1.0.0
         with:
@@ -32,7 +41,7 @@ jobs:
           username: ${{ secrets.PROD_VPS_SSH_USER }}
           key: ${{ secrets.PROD_VPS_SSH_KEY }}
           source: frontend/dist/frontend/browser/*
-          target: /var/www/understandingnotes
+          target: /var/www/understandnotes
           strip_components: 4
           rm: true
 
@@ -56,6 +65,15 @@ jobs:
         run: npx ng build --configuration staging
         working-directory: frontend
 
+      - name: Prepare staging web root
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_SSH_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            mkdir -p /var/www/understandnotes-staging
+
       - name: Deploy to staging nginx root
         uses: appleboy/scp-action@v1.0.0
         with:
@@ -63,6 +81,6 @@ jobs:
           username: ${{ secrets.VPS_SSH_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           source: frontend/dist/frontend/browser/*
-          target: /var/www/understandingnotes-staging
+          target: /var/www/understandnotes-staging
           strip_components: 4
           rm: true
