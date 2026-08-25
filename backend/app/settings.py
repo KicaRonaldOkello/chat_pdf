@@ -120,7 +120,7 @@ class Settings(BaseSettings):
     jwt_secret: str = ""  # REQUIRED — set in .env for all environments
     jwt_expires_days: int = 30
 
-    # CORS — comma-separated in env, e.g. CORS_ALLOW_ORIGINS="https://understandingnotes.com,https://www.understandingnotes.com"
+    # CORS — comma-separated in env, e.g. CORS_ALLOW_ORIGINS="https://understandnotes.com,https://www.understandnotes.com"
     cors_allow_origins: str = ""
     # Public origin of the Angular app — used for Dodo checkout return/cancel URLs.
     frontend_base_url: str = "http://localhost:4200"
