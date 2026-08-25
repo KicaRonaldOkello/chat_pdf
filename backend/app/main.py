@@ -121,8 +121,8 @@ app = FastAPI(title="Understanding Notes API", lifespan=lifespan)
 _cors_origins = [
     o.strip() for o in settings.cors_allow_origins.split(",") if o.strip()
 ] or [
-    "https://understandingnotes.com",
-    "https://www.understandingnotes.com",
+    "https://understandnotes.com",
+    "https://www.understandnotes.com",
     "http://localhost:4200",
     "http://127.0.0.1:4200",
 ]
