@@ -31,6 +31,6 @@
     <circle cx="300" cy="290" r="10"/>
     <circle cx="350" cy="290" r="22"/>
   </g>
-  <text x="250" y="356" font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="700" letter-spacing="3" fill="#000000" text-anchor="middle">UNDERSTANDING</text>
+  <text x="250" y="356" font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="700" letter-spacing="3" fill="#000000" text-anchor="middle">UNDERSTAND</text>
   <text x="250" y="440" font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="82" font-weight="900" letter-spacing="2" fill="#000000" text-anchor="middle">NOTES</text>
 </svg>
