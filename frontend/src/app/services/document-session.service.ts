@@ -569,9 +569,12 @@ export class DocumentSessionService implements OnDestroy {
           this.messageMeta[assistantIndex] = meta;
           this.onSessionChange?.();
         },
-        onLimitReached: () => {
+        onLimitReached: (notice) => {
           this.notify.warning(
-            'Daily word limit reached. Upgrade to Plus or Pro for more.',
+            this.usageLimitWarning(
+              notice.limit_type,
+              'Daily word limit reached. Upgrade to Plus or Pro for more.'
+            ),
             9000
           );
           this.onSessionChange?.();
@@ -582,10 +585,22 @@ export class DocumentSessionService implements OnDestroy {
         }
       });
     } catch (err: unknown) {
-      const streamErr = err as { status?: number; code?: string };
+      const streamErr = err as {
+        status?: number;
+        code?: string;
+        limitType?: string;
+      };
       if (streamErr.status === 402 || streamErr.code === 'usage_limit') {
+        const backendMessage = err instanceof Error ? err.message : '';
+        const warning =
+          backendMessage && !backendMessage.startsWith('Request failed')
+            ? backendMessage
+            : this.usageLimitWarning(
+                streamErr.limitType,
+                'Daily word limit reached. Upgrade to Plus or Pro for more.'
+              );
         this.notify.warning(
-          'Daily word limit reached. Upgrade to Plus or Pro to keep going.',
+          warning,
           9000
         );
         this.messages.splice(assistantIndex - 1, 2);
@@ -603,6 +618,24 @@ export class DocumentSessionService implements OnDestroy {
       this.currentStage = null;
       this.shouldScroll = true;
       this.onSessionChange?.();
+    }
+  }
+
+  private usageLimitWarning(
+    limitType: string | undefined,
+    fallback: string
+  ): string {
+    switch (limitType) {
+      case 'files_in_scope':
+        return 'Too many documents in scope for this chat. Close some tabs or upgrade your plan.';
+      case 'uploads':
+        return 'Daily upload limit reached. Upgrade to Plus or Pro for more.';
+      case 'upload_bytes':
+        return 'Daily upload storage limit reached. Upgrade to Plus or Pro for more.';
+      case 'words':
+        return 'Daily word limit reached. Upgrade to Plus or Pro for more.';
+      default:
+        return fallback;
     }
   }
 
