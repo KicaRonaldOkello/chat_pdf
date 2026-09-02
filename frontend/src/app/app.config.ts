@@ -1,11 +1,12 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { ApplicationConfig, importProvidersFrom, provideZoneChangeDetection } from '@angular/core';
+import { APP_INITIALIZER, ApplicationConfig, importProvidersFrom, provideZoneChangeDetection } from '@angular/core';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideRouter } from '@angular/router';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { routes } from './app.routes';
+import { AnalyticsService } from './services/analytics.service';
 import { authInterceptor } from './services/auth.interceptor';
 
 export const appConfig: ApplicationConfig = {
@@ -15,5 +16,11 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withInterceptors([authInterceptor])),
     importProvidersFrom(MatSnackBarModule, MatDialogModule),
     provideAnimationsAsync(),
+    {
+      provide: APP_INITIALIZER,
+      useFactory: (analytics: AnalyticsService) => () => analytics.init(),
+      deps: [AnalyticsService],
+      multi: true,
+    },
   ]
 };
