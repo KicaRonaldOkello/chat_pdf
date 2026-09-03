@@ -77,19 +77,6 @@ async def lifespan(_app: FastAPI):
 
         setup_loki_logging(settings.loki_url, settings.loki_application_label)
 
-    if settings.prometheus_enabled:
-        from app.monitoring import setup_prometheus
-
-        setup_prometheus(_app)
-
-    if settings.otel_enabled and settings.otel_exporter_otlp_endpoint:
-        from app.monitoring import _instrument_fastapi_app, setup_opentelemetry
-
-        setup_opentelemetry(
-            settings.otel_service_name, settings.otel_exporter_otlp_endpoint
-        )
-        _instrument_fastapi_app(_app)
-
     # Re-apply catalog prices so the plans table can't drift from code.
     try:
         sm = getattr(_app.state, "async_session_maker", None)
@@ -115,6 +102,21 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Understanding Notes API", lifespan=lifespan)
+
+# ── observability (must be installed before the app starts) ──────────────────
+
+if settings.prometheus_enabled:
+    from app.monitoring import setup_prometheus
+
+    setup_prometheus(app)
+
+if settings.otel_enabled and settings.otel_exporter_otlp_endpoint:
+    from app.monitoring import _instrument_fastapi_app, setup_opentelemetry
+
+    setup_opentelemetry(
+        settings.otel_service_name, settings.otel_exporter_otlp_endpoint
+    )
+    _instrument_fastapi_app(app)
 
 # ── security middleware ───────────────────────────────────────────────────────
 
