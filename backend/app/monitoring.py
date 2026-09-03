@@ -113,14 +113,12 @@ def setup_loki_logging(url: str, application: str) -> None:
 def setup_prometheus(app: FastAPI) -> None:
     """Expose ``GET /metrics`` with request rate, latency & in-flight gauges."""
     from prometheus_fastapi_instrumentator import Instrumentator
-    from prometheus_fastapi_instrumentator.metrics import _inprogress
 
     instrumentator = Instrumentator(
         should_group_status_codes=True,
         should_ignore_untemplated=False,
         should_instrument_requests_inprogress=True,
     )
-    instrumentator.add(_inprogress())
     instrumentator.instrument(app).expose(
         app,
         endpoint="/metrics",
